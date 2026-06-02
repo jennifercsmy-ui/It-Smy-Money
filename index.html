@@ -355,19 +355,12 @@
 
 
 
-    <script  src="./script.js"></script>
+  ...
+  </div>
 
-  </body>
-  
-</html>
-    <script  src="./script.js"></script>
+<script src="./script.js"></script>
+
 <script>
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./service-worker.js");
-  }
-</script>
-
-  <script>
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./service-worker.js", {
       scope: "./"
@@ -376,5 +369,4 @@
 </script>
 
 </body>
-  
 </html>

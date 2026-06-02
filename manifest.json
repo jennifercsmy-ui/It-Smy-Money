@@ -1,15 +1,16 @@
 {
   "name": "It Smy Money",
   "short_name": "Smy Money",
-  "start_url": "/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#edf1f8",
   "theme_color": "#1D3557",
   "icons": [
-  {
-    "src": "icon-512.png",
-    "sizes": "512x512",
-    "type": "image/png"
-  }
-]
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }

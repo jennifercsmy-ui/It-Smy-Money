@@ -307,7 +307,7 @@ const customUnit =
         amount,
         type,
         date,
-        repeat: item.fromHistoryUndo ? "once" : repeat,
+        repeat,
         customInterval,
         customUnit,
         fromHistoryUndo: item.fromHistoryUndo || false
@@ -318,11 +318,17 @@ const customUnit =
   });
 
   if (
-    pendingHistoryUndo &&
-    pendingHistoryUndo.restoredItemId === editingId
-  ) {
-    pendingHistoryUndo = null;
-  }
+  pendingHistoryUndo &&
+  pendingHistoryUndo.restoredItemId === editingId
+) {
+  historyItems = historyItems.filter(
+    item => item.historyKey !== pendingHistoryUndo.originalHistoryItem.historyKey
+  );
+
+  saveHistoryItems();
+
+  pendingHistoryUndo = null;
+}
 
   editingId = null;
     document.getElementById("formTitle").innerText = "Add Income or Bill";
@@ -385,30 +391,39 @@ window.scrollTo({
   behavior: "smooth"
 });
 }
-
 function cancelEdit() {
   const shouldReturnToCalendar = returnToCalendarAfterEdit;
   const shouldReturnToForecast = returnToForecastAfterEdit;
-  
+
   if (pendingHistoryUndo) {
+    if (pendingHistoryUndo.removeRestoredItemOnCancel) {
   items = items.filter(item => item.id !== pendingHistoryUndo.restoredItemId);
-
-  const alreadyBackInHistory = historyItems.some(
-    item => item.historyKey === pendingHistoryUndo.originalHistoryItem.historyKey
-  );
-
-  if (!alreadyBackInHistory) {
-    historyItems.push(pendingHistoryUndo.originalHistoryItem);
-  }
-
-  pendingHistoryUndo = null;
-
-  saveItems();
-  calculate();
-
-  showTab("calendarTab");
-  return;
 }
+
+    const alreadyBackInHistory = historyItems.some(
+      item => item.historyKey === pendingHistoryUndo.originalHistoryItem.historyKey
+    );
+
+    if (!alreadyBackInHistory) {
+      historyItems.push(pendingHistoryUndo.originalHistoryItem);
+    }
+
+    pendingHistoryUndo = null;
+    editingId = null;
+
+    clearInputs();
+
+    document.getElementById("formTitle").innerText = "Add Income or Bill";
+    document.getElementById("saveButton").innerText = "Add";
+    document.getElementById("cancelEditButton").style.display = "none";
+
+    saveItems();
+    saveHistoryItems();
+    calculate();
+
+    showTab("calendarTab");
+    return;
+  }
 
   returnToCalendarAfterEdit = false;
   returnToForecastAfterEdit = false;
@@ -426,6 +441,7 @@ function cancelEdit() {
     showTab("forecastTab");
   }
 }
+
 
 function deleteItem(id) {
   if (!confirm("Delete this item?")) return;
@@ -529,11 +545,30 @@ calculate();
 refreshSelectedCalendarDay();
 }
 
+function addMonthsSafe(date, monthsToAdd, preferredDay) {
+  const targetDay = preferredDay || date.getDate();
+
+  const newDate = new Date(date);
+  newDate.setDate(1);
+  newDate.setMonth(newDate.getMonth() + monthsToAdd);
+
+  const lastDayOfTargetMonth = new Date(
+    newDate.getFullYear(),
+    newDate.getMonth() + 1,
+    0
+  ).getDate();
+
+  newDate.setDate(Math.min(targetDay, lastDayOfTargetMonth));
+
+  return newDate;
+}
+
 function buildEventsUntil(endDate, today) {
   let events = [];
 
   items.forEach(item => {
     let itemDate = new Date(item.date + "T00:00:00");
+    const preferredMonthlyDay = itemDate.getDate();
     let safetyCounter = 0;
 
     while (itemDate <= endDate && safetyCounter < 500) {
@@ -560,7 +595,7 @@ function buildEventsUntil(endDate, today) {
       } else if (item.repeat === "biweekly") {
         itemDate.setDate(itemDate.getDate() + 14);
       } else if (item.repeat === "monthly") {
-        itemDate.setMonth(itemDate.getMonth() + 1);
+        itemDate = addMonthsSafe(itemDate, 1, preferredMonthlyDay);
       } else if (item.repeat === "yearly") {
         itemDate.setFullYear(itemDate.getFullYear() + 1);
       } else if (item.repeat === "firstBusinessDay") {
@@ -586,7 +621,7 @@ function buildEventsUntil(endDate, today) {
         } else if (unit === "weeks") {
           itemDate.setDate(itemDate.getDate() + interval * 7);
         } else if (unit === "months") {
-          itemDate.setMonth(itemDate.getMonth() + interval);
+          itemDate = addMonthsSafe(itemDate, interval, preferredMonthlyDay);
         } else {
           break;
         }
@@ -727,6 +762,14 @@ overviewEvents.forEach(event => {
     balance: overviewRunningBalance
   });
 });  
+  
+  overviewForecast = overviewForecast.filter(item => {
+  const itemDate = new Date(item.date);
+  itemDate.setHours(0, 0, 0, 0);
+
+  return itemDate >= todayFilter;
+});
+  
   displaySummary(forecast);
   updateDashboard(overviewForecast, balance, buffer);
   currentForecast = forecast;
@@ -1623,37 +1666,52 @@ function displayCalendarHistory() {
 }
 
 function undoHistoryItem(historyKey) {
-  const item = historyItems.find(item => item.historyKey === historyKey);
-  if (!item) return;
+  const historyItem = historyItems.find(item => item.historyKey === historyKey);
+  if (!historyItem) return;
 
-  const todayKey = new Date().toISOString().split("T")[0];
+  const originalItemId = historyItem.itemId;
 
-  const restoredItem = {
-  ...item,
-  id: Date.now(),
-  date: todayKey,
-  repeat: "once",
-  fromHistoryUndo: true
-};
+  let existingItem = items.find(
+    item => String(item.id) === String(originalItemId)
+  );
 
-  delete restoredItem.historyKey;
-  delete restoredItem.loggedAt;
-  delete restoredItem.deletedAt;
-  delete restoredItem.deletedFrom;
-  
-  pendingHistoryUndo = {
-  originalHistoryItem: item,
-  restoredItemId: restoredItem.id
-};
+  const createdTemporaryItem = !existingItem;
 
-  items.push(restoredItem);
+  if (!existingItem) {
+    existingItem = {
+      id: originalItemId || Date.now(),
+      name: historyItem.name,
+      amount: historyItem.amount,
+      type: historyItem.type || (historyItem.amount >= 0 ? "income" : "bill"),
+      date: historyItem.dateKey || dateToKey(new Date(historyItem.date)),
+      repeat: historyItem.repeat || "once",
+      customInterval: historyItem.customInterval || 1,
+      customUnit: historyItem.customUnit || "days",
+      fromHistoryUndo: true
+    };
+
+    items.push(existingItem);
+  } else {
+    existingItem.type =
+      existingItem.type || historyItem.type || (historyItem.amount >= 0 ? "income" : "bill");
+
+    existingItem.repeat =
+      existingItem.repeat || historyItem.repeat || "once";
+  }
 
   historyItems = historyItems.filter(item => item.historyKey !== historyKey);
 
-  saveItems();
-  calculate();
+  pendingHistoryUndo = {
+    originalHistoryItem: historyItem,
+    restoredItemId: existingItem.id,
+    removeRestoredItemOnCancel: createdTemporaryItem
+  };
 
-  editItem(restoredItem.id);
+  saveItems();
+  saveHistoryItems();
+
+  editingId = existingItem.id;
+  editItem(existingItem.id);
   showTab("settingsTab");
 }
 
@@ -2111,7 +2169,9 @@ if (
     const dateStr =
       `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-    const dayForecast = forecast.filter(item => item.dateKey === dateStr);
+    const dayForecast = forecast.filter(item =>
+  item.dateKey === dateStr && !item.isRangeEnd
+);
     console.log("history:", history);
     
     
@@ -2210,9 +2270,7 @@ function editItemFromForecast(id) {
 function refreshSelectedCalendarDay() {
   if (!selectedCalendarDate) return;
 
-  const selectedEvents = currentForecast.filter(
-    item => item.dateKey === selectedCalendarDate
-  );
+  const selectedEvents = currentForecast
 
   const selectedHistoryEvents = historyItems.filter(
     item => item.dateKey === selectedCalendarDate

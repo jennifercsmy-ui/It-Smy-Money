@@ -574,19 +574,19 @@ function buildEventsUntil(endDate, today) {
     while (itemDate <= endDate && safetyCounter < 500) {
       safetyCounter++;
 
-      if (itemDate >= today || item.date < dateToKey(today)) {
-        const skipped = isSkipped(item.id, itemDate);
+      if (itemDate >= today) {
+  const skipped = isSkipped(item.id, itemDate);
 
-        events.push({
-          itemId: item.id,
-          date: new Date(itemDate),
-          dateKey: dateToKey(itemDate),
-          name: item.name,
-          amount: item.amount,
-          repeat: item.repeat,
-          skipped
-        });
-      }
+  events.push({
+    itemId: item.id,
+    date: new Date(itemDate),
+    dateKey: dateToKey(itemDate),
+    name: item.name,
+    amount: item.amount,
+    repeat: item.repeat,
+    skipped
+  });
+}
 
       if (item.repeat === "once") break;
 

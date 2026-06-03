@@ -647,10 +647,11 @@ displaySkippedItems();
 displayDeletedItems();
 displayCalendarHistory();
 
-  let balance = parseFloat(balanceInput.value) || 0;
-  let buffer = parseFloat(bufferInput.value) || 0;
-  window.rangeDays = window.rangeDays || parseInt(rangeInput.value) || 30;
-let rangeDays = window.rangeDays;
+let balance = parseFloat(balanceInput.value) || 0;
+let buffer = parseFloat(bufferInput.value) || 0;
+
+let rangeDays = window.rangeDays || parseInt(rangeInput.value) || 30;
+window.rangeDays = rangeDays;
   
 
   const today = new Date();
@@ -961,6 +962,7 @@ const whatsLeft = moneyIn - moneyOut;
 }
 
 function setForecastRange(days) {
+  rangeDays = days;
   window.rangeDays = days;
 const chartCard = document.getElementById("chartCard");
 if (chartCard) chartCard.classList.add("chart-updating");

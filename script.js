@@ -914,12 +914,14 @@ function updateDashboard(forecast, startingBalance, buffer) {
 
   const warning = negative || belowBuffer;
 
+  if (warningEl) {
   if (warning) {
     const days = daysUntil(warning.date, today);
     warningEl.innerText = days + " day" + (days === 1 ? "" : "s");
   } else {
     warningEl.innerText = "All Clear";
   }
+}
 
   lowestEl.className =
     "dash-value " + ((lowest && lowest.balance < 0) ? "bill" : "income");
@@ -927,8 +929,10 @@ function updateDashboard(forecast, startingBalance, buffer) {
   monthlyEl.className =
     "dash-value " + (netMonthly >= 0 ? "income" : "bill");
 
+  if (warningEl) {
   warningEl.className =
     "dash-value " + (warning ? "bill" : "income");
+}
 
   if (upcomingEl) {
     const upcomingBills = activeForecast
@@ -1026,8 +1030,10 @@ const whatsLeft = moneyIn - moneyOut;
     <p><strong>Money Out:</strong><br>
     <span class="bill">${formatMoney(moneyOut)}</span></p>
 
-    <p><strong>What's Left:</strong><br>
-    <span class="${whatsLeft >= 0 ? "income" : "bill"}">${formatMoney(whatsLeft)}</span></p>
+    <p><strong>${whatsLeft >= 0 ? "Growing" : "Shrinking"}:</strong><br>
+<span class="${whatsLeft >= 0 ? "income" : "bill"}">
+  ${formatMoney(whatsLeft)}
+</span></p>
   `;
 }
 

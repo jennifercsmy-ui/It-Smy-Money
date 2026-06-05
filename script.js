@@ -17,6 +17,7 @@ let historyItems =
 let scrubberTimeout;
 let pinnedChartSelection = false;
 let pendingHistoryUndo = null;
+let processedEarlyItems = JSON.parse(localStorage.getItem("processedEarlyItems")) || [];
 
 const balanceInput = document.getElementById("balance");
 const bufferInput = document.getElementById("buffer");
@@ -92,6 +93,8 @@ function saveSettings() {
   showSaveIndicator();
 }
 
+
+
 function toggleCustomRepeatFields() {
   
   const repeat = document.getElementById("repeat").value;
@@ -104,6 +107,10 @@ function toggleCustomRepeatFields() {
   } else {
     customFields.style.display = "none";
   }
+}
+
+function saveProcessedEarlyItems() {
+  localStorage.setItem("processedEarlyItems", JSON.stringify(processedEarlyItems));
 }
 
 function showSaveIndicator() {
@@ -497,6 +504,60 @@ function isSkipped(itemId, dateObj) {
   return skippedEvents.some(skip => skip.key === key);
 }
 
+function processEarly(itemId, dateKey, name, amount) {
+  if (!confirm("Process this item today?\n\nYour current balance will update now, and the original future date will be marked as processed early.")) return;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const todayKey = dateToKey(today);
+  const originalKey = itemId + "|" + dateKey;
+  const processedEarlyKey = itemId + "|" + todayKey + "|early|" + dateKey;
+
+  const alreadyProcessed = processedEarlyItems.some(
+    item => item.originalKey === originalKey
+  );
+
+  if (alreadyProcessed) {
+    alert("This item was already processed early.");
+    return;
+  }
+
+  const currentBalance = parseFloat(balanceInput.value) || 0;
+  balanceInput.value = (currentBalance + amount).toFixed(2);
+  localStorage.setItem("cashForecastBalance", balanceInput.value);
+
+  processedEarlyItems.push({
+    key: processedEarlyKey,
+    originalKey,
+    itemId,
+    originalDateKey: dateKey,
+    processedDateKey: todayKey,
+    name,
+    amount,
+    loggedAt: new Date().toISOString()
+  });
+
+  historyItems.push({
+    itemId,
+    date: today,
+    dateKey: todayKey,
+    name,
+    amount,
+    repeat: "once",
+    skipped: false,
+    processedEarly: true,
+    originalDateKey: dateKey,
+    historyKey: processedEarlyKey,
+    loggedAt: new Date().toISOString()
+  });
+
+  saveItems();
+  saveHistoryItems();
+  saveProcessedEarlyItems();
+  calculate();
+}
+
 function skipEvent(itemId, dateKey, name, amount = 0) {
   const key = itemId + "|" + dateKey;
 
@@ -574,18 +635,27 @@ function buildEventsUntil(endDate, today) {
     while (itemDate <= endDate && safetyCounter < 500) {
       safetyCounter++;
 
-      if (itemDate >= today) {
-  const skipped = isSkipped(item.id, itemDate);
+if (itemDate >= today) {
+  const dateKey = dateToKey(itemDate);
+  const originalKey = item.id + "|" + dateKey;
 
-  events.push({
-    itemId: item.id,
-    date: new Date(itemDate),
-    dateKey: dateToKey(itemDate),
-    name: item.name,
-    amount: item.amount,
-    repeat: item.repeat,
-    skipped
-  });
+  const processedEarly = processedEarlyItems.some(
+    processed => processed.originalKey === originalKey
+  );
+
+  if (!processedEarly) {
+    const skipped = isSkipped(item.id, itemDate);
+
+    events.push({
+      itemId: item.id,
+      date: new Date(itemDate),
+      dateKey,
+      name: item.name,
+      amount: item.amount,
+      repeat: item.repeat,
+      skipped
+    });
+  }
 }
 
       if (item.repeat === "once") break;
@@ -1625,7 +1695,7 @@ function displayCalendarHistory() {
       const itemDate = new Date(item.date);
       itemDate.setHours(0,0,0,0);
 
-      return itemDate < today;
+      return itemDate < today || item.processedEarly;
     })
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -1646,9 +1716,10 @@ function displayCalendarHistory() {
         ${formatDateObj(new Date(item.date))}
       </div>
 
-      <div class="forecast-sub-row">
-        Balance: ${formatMoney(item.balance)}
-      </div>
+     <div class="forecast-sub-row">
+  ${formatDateObj(new Date(item.date))}
+  ${item.processedEarly ? ` • Processed early from ${item.originalDateKey}` : ""}
+</div>
 
       <div class="compact-buttons">
   <span class="${item.amount >= 0 ? "money-in" : "money-out"}">
@@ -1670,6 +1741,28 @@ function displayCalendarHistory() {
 function undoHistoryItem(historyKey) {
   const historyItem = historyItems.find(item => item.historyKey === historyKey);
   if (!historyItem) return;
+  if (historyItem.processedEarly) {
+  const currentBalance = parseFloat(balanceInput.value) || 0;
+
+  // Reverse the Process Early balance change
+  balanceInput.value = (currentBalance - historyItem.amount).toFixed(2);
+  localStorage.setItem("cashForecastBalance", balanceInput.value);
+
+  // Remove the processed-early blocker so the original future item returns
+  processedEarlyItems = processedEarlyItems.filter(
+    item => item.key !== historyItem.historyKey
+  );
+
+  // Remove the history record
+  historyItems = historyItems.filter(item => item.historyKey !== historyKey);
+
+  saveProcessedEarlyItems();
+  saveHistoryItems();
+  saveItems();
+  calculate();
+
+  return;
+}
 
   const originalItemId = historyItem.itemId;
 
@@ -1929,8 +2022,12 @@ if (forecast.length === 0) {
   ${formatDateObj(new Date(item.date))} • ${formatMoney(item.amount)}
 </div>
 
-  <div class="compact-buttons">
+<div class="compact-buttons">
   <button class="edit" onclick="editItemFromForecast(${item.itemId})">Edit</button>
+
+  <button class="compact-action" onclick="processEarly(${item.itemId}, '${item.dateKey}', '${escapeText(item.name)}', ${item.amount})">
+    Process Early
+  </button>
 
   ${
     item.skipped

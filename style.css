@@ -188,7 +188,16 @@ z-index: 2;
   margin: 0;
   font-size: 1.2rem;
 }
+.card-details,
+.mini-note {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 4px;
+}
 
+.dash-card {
+  cursor: pointer;
+}
 .overview-chart-wrap {
   position: relative;
   width: 100%;

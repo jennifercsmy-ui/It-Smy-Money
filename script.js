@@ -140,7 +140,18 @@ function toggleHistoryPanel() {
 
   displayCalendarHistory();
 }
+function toggleDashCard(type) {
 
+  const front = document.getElementById(type + "Front");
+  const back = document.getElementById(type + "Back");
+
+  if (!front || !back) return;
+
+  const showingFront = front.style.display !== "none";
+
+  front.style.display = showingFront ? "none" : "block";
+  back.style.display = showingFront ? "block" : "none";
+}
 function showTab(tabId) {
   document.querySelectorAll(".tab-content").forEach(tab => {
     tab.classList.remove("active-tab");
@@ -635,7 +646,7 @@ function buildEventsUntil(endDate, today) {
     while (itemDate <= endDate && safetyCounter < 500) {
       safetyCounter++;
 
-if (itemDate >= today) {
+if (itemDate > today) {
   const dateKey = dateToKey(itemDate);
   const originalKey = item.id + "|" + dateKey;
 
@@ -753,33 +764,56 @@ let overviewEvents = buildEventsUntil(overviewEndDate, today);
     });
   });
 
- forecast.forEach(item => {
-  const itemDate = new Date(item.date);
+let processedDueItems = false;
+
+items.forEach(item => {
+  let itemDate = new Date(item.date + "T00:00:00");
   itemDate.setHours(0, 0, 0, 0);
 
   const todayCopy = new Date();
   todayCopy.setHours(0, 0, 0, 0);
 
-  const historyKey = item.itemId + "|" + item.dateKey;
+  const dateKey = dateToKey(itemDate);
+  const historyKey = item.id + "|" + dateKey;
 
   const alreadyLogged = historyItems.some(
     historyItem => historyItem.historyKey === historyKey
   );
 
-   const alreadyDeleted = deletedItems.some(
-  deletedItem => deletedItem.historyKey === historyKey
-);
-   
-  if (itemDate < todayCopy && !alreadyLogged && !alreadyDeleted) {
+  const alreadyDeleted = deletedItems.some(
+    deletedItem => deletedItem.historyKey === historyKey
+  );
+
+  if (itemDate <= todayCopy && !alreadyLogged && !alreadyDeleted) {
     historyItems.push({
-  ...item,
-  historyKey,
-  loggedAt: new Date().toISOString()
-});
+      itemId: item.id,
+      date: new Date(itemDate),
+      dateKey,
+      name: item.name,
+      amount: item.amount,
+      repeat: item.repeat,
+      type: item.type,
+      customInterval: item.customInterval,
+      customUnit: item.customUnit,
+      skipped: false,
+      balance: (parseFloat(balanceInput.value) || 0) + item.amount,
+      historyKey,
+      loggedAt: new Date().toISOString()
+    });
 
+    const currentBalance = parseFloat(balanceInput.value) || 0;
+    balanceInput.value = (currentBalance + item.amount).toFixed(2);
+    localStorage.setItem("cashForecastBalance", balanceInput.value);
 
+    processedDueItems = true;
   }
 });
+
+if (processedDueItems) {
+  saveHistoryItems();
+  calculate();
+  return;
+}
 
 const todayFilter = new Date();
 todayFilter.setHours(0, 0, 0, 0);
@@ -788,7 +822,7 @@ forecast = forecast.filter(item => {
   const itemDate = new Date(item.date);
   itemDate.setHours(0, 0, 0, 0);
 
-  return itemDate >= todayFilter;
+  return itemDate > todayFilter;
 });
   
   const rangeEndDate = new Date(todayFilter);
@@ -822,6 +856,17 @@ saveHistoryItems();
  displayCalendarHistory(); 
 let overviewForecast = [];
 let overviewRunningBalance = balance;
+
+overviewForecast.push({
+  name: "Today",
+  label: "Today",
+  amount: 0,
+  date: new Date(),
+  dateKey: dateToKey(new Date()),
+  balance: overviewRunningBalance,
+  skipped: false,
+  isStartingPoint: true
+});
 
 overviewEvents.forEach(event => {
   if (!event.skipped) {
@@ -868,17 +913,25 @@ function updateDashboard(forecast, startingBalance, buffer) {
   if (!currentEl) return;
 
   currentEl.innerText = formatMoney(startingBalance);
-
+const todayBackValue = document.getElementById("todayBackValue");
+if (todayBackValue) {
+  todayBackValue.innerText = formatMoney(startingBalance);
+}
   const activeForecast = forecast.filter(item => !item.skipped);
 
-  let lowest = null;
+ let lowest = {
+  name: "Today",
+  date: new Date(),
+  balance: startingBalance
+};
 
-  activeForecast.forEach(item => {
-   console.log(item.name, item.balance); 
-    if (lowest === null || item.balance < lowest.balance) {
-      lowest = item;
-    }
-  });
+activeForecast.forEach(item => {
+  console.log(item.name, item.balance);
+
+  if (item.balance < lowest.balance) {
+    lowest = item;
+  }
+});
 
   lowestEl.innerText = lowest
     ? formatMoney(lowest.balance)
@@ -886,22 +939,10 @@ function updateDashboard(forecast, startingBalance, buffer) {
   window.lowestForecastItem = lowest;
   console.log("Lowest card updated:", lowest);
 
-  let monthlyIncome = 0;
-  let monthlyBills = 0;
 
-  items.forEach(item => {
-    const monthlyAmount = estimateMonthlyAmount(item);
+  const playMoney = Math.max(0, lowest.balance - buffer);
 
-    if (item.amount >= 0) {
-      monthlyIncome += monthlyAmount;
-    } else {
-      monthlyBills += Math.abs(monthlyAmount);
-    }
-  });
-
-  const netMonthly = monthlyIncome - monthlyBills;
-
-  monthlyEl.innerText = formatMoney(netMonthly);
+monthlyEl.innerText = formatMoney(playMoney);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -927,7 +968,7 @@ function updateDashboard(forecast, startingBalance, buffer) {
     "dash-value " + ((lowest && lowest.balance < 0) ? "bill" : "income");
 
   monthlyEl.className =
-    "dash-value " + (netMonthly >= 0 ? "income" : "bill");
+  "dash-value " + (playMoney > 0 ? "income" : "bill");
 
   if (warningEl) {
   warningEl.className =
@@ -935,13 +976,13 @@ function updateDashboard(forecast, startingBalance, buffer) {
 }
 
   if (upcomingEl) {
-    const upcomingBills = activeForecast
-  .filter(item => {
-    const itemDate = new Date(item.date);
-    itemDate.setHours(0, 0, 0, 0);
+  const upcomingBills = activeForecast
+    .filter(item => {
+      const itemDate = new Date(item.date);
+      itemDate.setHours(0, 0, 0, 0);
 
-    return itemDate >= today;
-  })
+      return !item.isStartingPoint && itemDate >= today;
+    })
   .sort((a, b) => new Date(a.date) - new Date(b.date))
   .slice(0, 3);
 
@@ -1000,20 +1041,19 @@ forecast
 
 const whatsLeft = moneyIn - moneyOut;
 
-  let lowest = null;
+let lowest = {
+  name: "Today",
+  date: new Date(),
+  balance: parseFloat(balanceInput.value) || 0
+};
 
-  forecast
-    .filter(item => !item.skipped)
-    .forEach(item => {
-      if (lowest === null || item.balance < lowest.balance) {
-        lowest = item;
-      }
-    });
-
-  if (!lowest) {
-    div.innerHTML = `<div class="summary-good">No upcoming forecast items yet.</div>`;
-    return;
-  }
+forecast
+  .filter(item => !item.skipped && !item.isRangeEnd)
+  .forEach(item => {
+    if (item.balance < lowest.balance) {
+      lowest = item;
+    }
+  });
 
   const lowestClass = lowest.balance < 0 ? "summary-bad" : "summary-good";
 
@@ -1701,7 +1741,7 @@ function displayCalendarHistory() {
       const itemDate = new Date(item.date);
       itemDate.setHours(0,0,0,0);
 
-      return itemDate < today || item.processedEarly;
+      return itemDate <= today || item.processedEarly;
     })
     .sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -2455,4 +2495,58 @@ function showCalendarDayDetails(dateStr, events, historyEvents = []) {
         : ""
     }
   `;
+}
+function auditForecast() {
+  console.clear();
+
+  const issues = [];
+
+  // Duplicate check
+  const seen = new Set();
+
+  currentForecast
+    .filter(item => !item.isRangeEnd)
+    .forEach(item => {
+      const key = item.itemId + "|" + item.dateKey;
+
+      if (seen.has(key)) {
+        issues.push(
+          `Duplicate event: ${item.name} (${item.dateKey})`
+        );
+      }
+
+      seen.add(key);
+    });
+
+  // Running balance check
+  let expectedBalance = currentStartingBalance;
+
+  currentForecast
+    .filter(item => !item.isRangeEnd)
+    .forEach(item => {
+
+      if (!item.skipped) {
+        expectedBalance += item.amount;
+      }
+
+      const expected = Number(expectedBalance.toFixed(2));
+      const actual = Number(item.balance.toFixed(2));
+
+      if (expected !== actual) {
+        issues.push(
+          `Balance mismatch: ${item.name} ${item.dateKey}
+Expected: ${expected}
+Actual: ${actual}`
+        );
+      }
+    });
+
+  if (issues.length === 0) {
+    console.log("✅ AUDIT PASSED");
+    console.log("No balance mismatches found.");
+    console.log("No duplicate forecast events found.");
+  } else {
+    console.warn(`❌ AUDIT FOUND ${issues.length} ISSUE(S)`);
+    issues.forEach(issue => console.warn(issue));
+  }
 }

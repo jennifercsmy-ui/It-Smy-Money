@@ -782,7 +782,9 @@ const alreadyDeleted = deletedItems.some(
   deletedItem => deletedItem.historyKey === historyKey
 );
 
-const alreadySkipped = isSkipped(item.id, itemDate);
+const alreadySkipped = skippedEvents.some(
+  skip => String(skip.itemId) === String(item.id)
+);
 
 if (itemDate <= todayCopy && !alreadyLogged && !alreadyDeleted && !alreadySkipped) {
   historyItems.push({

@@ -764,8 +764,6 @@ let overviewEvents = buildEventsUntil(overviewEndDate, today);
     });
   });
 
-let processedDueItems = false;
-
 items.forEach(item => {
   let itemDate = new Date(item.date + "T00:00:00");
   itemDate.setHours(0, 0, 0, 0);
@@ -774,46 +772,40 @@ items.forEach(item => {
   todayCopy.setHours(0, 0, 0, 0);
 
   const dateKey = dateToKey(itemDate);
-  const historyKey = item.id + "|" + dateKey;
+const historyKey = item.id + "|" + dateKey;
 
-  const alreadyLogged = historyItems.some(
-    historyItem => historyItem.historyKey === historyKey
-  );
+const alreadyLogged = historyItems.some(
+  historyItem => historyItem.historyKey === historyKey
+);
 
-  const alreadyDeleted = deletedItems.some(
-    deletedItem => deletedItem.historyKey === historyKey
-  );
+const alreadyDeleted = deletedItems.some(
+  deletedItem => deletedItem.historyKey === historyKey
+);
 
-  if (itemDate <= todayCopy && !alreadyLogged && !alreadyDeleted) {
-    historyItems.push({
-      itemId: item.id,
-      date: new Date(itemDate),
-      dateKey,
-      name: item.name,
-      amount: item.amount,
-      repeat: item.repeat,
-      type: item.type,
-      customInterval: item.customInterval,
-      customUnit: item.customUnit,
-      skipped: false,
-      balance: (parseFloat(balanceInput.value) || 0) + item.amount,
-      historyKey,
-      loggedAt: new Date().toISOString()
-    });
+const alreadySkipped = isSkipped(item.id, itemDate);
+
+if (itemDate <= todayCopy && !alreadyLogged && !alreadyDeleted && !alreadySkipped) {
+  historyItems.push({
+    itemId: item.id,
+    date: new Date(itemDate),
+    dateKey,
+    name: item.name,
+    amount: item.amount,
+    repeat: item.repeat,
+    type: item.type,
+    customInterval: item.customInterval,
+    customUnit: item.customUnit,
+    skipped: false,
+    balance: (parseFloat(balanceInput.value) || 0) + item.amount,
+    historyKey,
+    loggedAt: new Date().toISOString()
+  });
 
     const currentBalance = parseFloat(balanceInput.value) || 0;
     balanceInput.value = (currentBalance + item.amount).toFixed(2);
     localStorage.setItem("cashForecastBalance", balanceInput.value);
-
-    processedDueItems = true;
   }
 });
-
-if (processedDueItems) {
-  saveHistoryItems();
-  calculate();
-  return;
-}
 
 const todayFilter = new Date();
 todayFilter.setHours(0, 0, 0, 0);

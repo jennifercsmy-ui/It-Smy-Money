@@ -1770,7 +1770,6 @@ div.innerHTML = deletedItems.map(item => `
           <div class="upcoming-date">
           Deleted ${formatShortDate(new Date(item.deletedAt))}
 ${item.deletedFrom === "skipped" ? " • Skipped Occurrence" : ""}
-${item.deletedFrom === "skipped" ? " • Skipped Occurrence" : ""}
           </div>
         </div>
 

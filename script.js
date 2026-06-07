@@ -633,13 +633,24 @@ function restoreDeletedItem(id) {
 
   const restoredItem = deletedItems[itemIndex];
 
-  items.push({
-    ...restoredItem
-  });
+  if (restoredItem.deletedFrom === "skipped") {
+    skippedEvents.push({
+      key: restoredItem.skipKey,
+      itemId: restoredItem.itemId,
+      dateKey: restoredItem.date,
+      name: restoredItem.name,
+      amount: restoredItem.amount
+    });
+  } else {
+    items.push({
+      ...restoredItem
+    });
+  }
 
   deletedItems.splice(itemIndex, 1);
 
   saveItems();
+  saveSkippedEvents();
   saveDeletedItems();
 
   calculate();
@@ -652,7 +663,32 @@ saveSkippedEvents();
 calculate();
 refreshSelectedCalendarDay();
 }
+function removeSkippedEvent(key) {
+  const skip = skippedEvents.find(skip => skip.key === key);
+  if (!skip) return;
 
+  if (!confirm("Remove this skipped item? It will move to Deleted Items.")) return;
+
+  deletedItems.push({
+  id: Date.now(),
+  itemId: skip.itemId,
+  name: skip.name,
+  amount: skip.amount,
+  date: skip.dateKey,
+  repeat: "once",
+  deletedAt: new Date().toISOString(),
+  deletedFrom: "skipped",
+  skipKey: skip.key
+});
+
+  skippedEvents = skippedEvents.filter(skip => skip.key !== key);
+
+  saveDeletedItems();
+  saveSkippedEvents();
+
+  calculate();
+  refreshSelectedCalendarDay();
+}
 function addMonthsSafe(date, monthsToAdd, preferredDay) {
   const targetDay = preferredDay || date.getDate();
 
@@ -1732,7 +1768,9 @@ div.innerHTML = deletedItems.map(item => `
         <div>
           <div class="deleted-name">${item.name}</div>
           <div class="upcoming-date">
-            Deleted ${formatShortDate(new Date(item.deletedAt))}
+          Deleted ${formatShortDate(new Date(item.deletedAt))}
+${item.deletedFrom === "skipped" ? " • Skipped Occurrence" : ""}
+${item.deletedFrom === "skipped" ? " • Skipped Occurrence" : ""}
           </div>
         </div>
 
@@ -2061,12 +2099,18 @@ console.log("Skipped list:", sortedSkips);
 </div>
 
   <div class="compact-buttons">
-    <button
-      class="restore compact-action"
-      onclick="restoreEvent('${skip.key}')">
-      Restore
-    </button>
-  </div>
+  <button
+    class="restore compact-action"
+    onclick="restoreEvent('${skip.key}')">
+    Restore
+  </button>
+
+  <button
+    class="delete compact-action"
+    onclick="removeSkippedEvent('${skip.key}')">
+    Remove
+  </button>
+</div>
 `;
 
     div.appendChild(el);

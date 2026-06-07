@@ -194,9 +194,23 @@ z-index: 2;
   color: var(--muted);
   margin-top: 4px;
 }
-
 .dash-card {
-  cursor: pointer;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-face {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-card > div {
+  width: 100%;
 }
 .overview-chart-wrap {
   position: relative;
@@ -591,11 +605,128 @@ touch-action: none;
 .upcoming-left div:last-child {
   font-weight: 500;
 }
+.deleted-item-row {
+  align-items: flex-start;
+}
 
+.bulk-checkbox {
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.deleted-item-row .upcoming-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.deleted-item-row .upcoming-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.deleted-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.deleted-row:last-child {
+  border-bottom: none;
+}
+
+.deleted-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.deleted-main {
+  display: block;
+}
+
+.deleted-name {
+  font-weight: 500;
+}
+
+.deleted-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.bulk-checkbox {
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.bulk-actions-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.bulk-actions-buttons button {
+  flex: 1;
+}
 
 .muted {
   color: #64748b;
   font-size: 14px;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+#deletedItemsList {
+  width: 100%;
+}
+
+.deleted-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.deleted-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.deleted-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+  width: 100%;
+  min-width: 0;
+}
+
+.deleted-name {
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.deleted-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.deleted-actions button {
+  max-width: 100%;
+}
+
+.bulk-checkbox {
+  margin-top: 2px;
+  flex-shrink: 0;
 }
 
     input, select, button {
@@ -690,7 +821,19 @@ button:hover {
   background: var(--danger);
   color: white;
 }
-
+button:disabled,
+button:disabled:hover,
+button:disabled:focus,
+button:disabled:active {
+  background: #f3f4f6 !important;
+  color: #c0c4cc !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: none !important;
+  transform: none !important;
+  filter: none !important;
+  opacity: 1;
+  cursor: not-allowed;
+}
 .collapsible-header {
   width: 100%;
 
@@ -1093,4 +1236,34 @@ color: #1D3557 !important;
   box-shadow: none !important;
   filter: none !important;
 }
+  
+  input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  padding: 0;
+}
+
+.bulk-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 0;
+}
+#restoreSelectedBtn,
+#deleteSelectedBtn {
+  margin: 2px 0;
+}
+.bulk-actions label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.bulk-checkbox {
+  width: auto;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+  
 }

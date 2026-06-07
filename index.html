@@ -3,7 +3,7 @@
 
   <head>
     <meta charset="UTF-8">
-    <title>It Smy Money v5.7.2</title>
+    <title>It Smy Money v5.7.3</title>
     <link rel="stylesheet" href="./style.css">
 
   </head>
@@ -66,35 +66,43 @@
     
  <div class="dashboard">
   <div id="todayCard" class="dash-card" onclick="toggleDashCard('today')">
-    <div id="todayFront">
+   <div id="todayFront" class="dash-face">
       <div class="dash-label">Today</div>
       <div id="dashCurrent" class="dash-value">$0.00</div>
     </div>
 
-    <div id="todayBack" style="display:none;">
+    <div id="todayBack" class="dash-face" style="display:none;">
       <div class="dash-label">Current Balance</div>
       <div class="dash-value" id="todayBackValue">$0.00</div>
       <div class="mini-note">Tap to return</div>
     </div>
   </div>
 
-  <div id="lowestCard" class="dash-card" onclick="toggleDashCard('lowest')">
+ <div id="lowestCard" class="dash-card" onclick="toggleDashCard('lowest')">
+  <div id="lowestFront" class="dash-face">
     <div class="dash-label">Rock Bottom</div>
     <div id="dashLowest" class="dash-value">$0.00</div>
-    <div id="lowestDetails" class="card-details" style="display:none;">
-      <strong>Lowest Point</strong><br>
-      This is the lowest your balance gets over the next 90 days.
-    </div>
   </div>
 
-  <div id="playMoneyCard" class="dash-card" onclick="toggleDashCard('playmoney')">
+  <div id="lowestBack" class="dash-face" style="display:none;">
+    <div class="dash-label">Lowest Balance</div>
+    <div class="dash-value" id="lowestBackValue">$0.00</div>
+    <div class="mini-note">Tap to return</div>
+  </div>
+</div>
+
+<div id="playMoneyCard" class="dash-card" onclick="toggleDashCard('playmoney')">
+  <div id="playmoneyFront" class="dash-face">
     <div class="dash-label">Play Money</div>
     <div id="dashMonthly" class="dash-value">$0.00</div>
-    <div id="playMoneyDetails" class="card-details" style="display:none;">
-      <strong>Safe to Spend</strong><br>
-      You can spend this and still stay above your safety buffer.
-    </div>
   </div>
+
+  <div id="playmoneyBack" class="dash-face" style="display:none;">
+    <div class="dash-label">Safe to Spend</div>
+    <div class="dash-value" id="playMoneyBackValue">$0.00</div>
+    <div class="mini-note">Rock Bottom - Buffer</div>
+  </div>
+</div>
 </div>
     
  <div class="chart-shell overview-chart-wrap">
@@ -319,7 +327,7 @@
     <option value="custom">Custom interval</option>
   </select>
 
-  <button id="saveButton" onclick="saveFormItem()">Add</button>
+ <button id="saveButton" onclick="saveFormItem()" disabled>Add</button>
   <button id="cancelEditButton" class="secondary" onclick="cancelEdit()">Cancel Edit</button>
 </div>
 </div>
@@ -347,8 +355,35 @@
   </button>
 
   <div id="deletedItemsPanel" style="display: none;">
-    <div id="deletedItemsList"></div>
+
+  <div id="deletedBulkActions" class="bulk-actions">
+
+    <label>
+      <input
+  type="checkbox"
+  id="selectAllDeleted"
+  onchange="toggleSelectAllDeleted()"
+>
+      Select All
+    </label>
+
+ <div class="bulk-actions-buttons">
+
+  <button id="restoreSelectedBtn" onclick="restoreSelectedDeletedItems()">
+    Restore (0)
+  </button>
+
+  <button id="deleteSelectedBtn" onclick="deleteSelectedForever()">
+    Delete Forever (0)
+  </button>
+
+</div>
+
   </div>
+
+  <div id="deletedItemsList"></div>
+
+</div>
 </div>
 
 

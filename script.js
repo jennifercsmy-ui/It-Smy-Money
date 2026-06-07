@@ -18,6 +18,7 @@ let scrubberTimeout;
 let pinnedChartSelection = false;
 let pendingHistoryUndo = null;
 let processedEarlyItems = JSON.parse(localStorage.getItem("processedEarlyItems")) || [];
+let selectedDeletedItems = new Set();
 
 const balanceInput = document.getElementById("balance");
 const bufferInput = document.getElementById("buffer");
@@ -141,7 +142,6 @@ function toggleHistoryPanel() {
   displayCalendarHistory();
 }
 function toggleDashCard(type) {
-
   const front = document.getElementById(type + "Front");
   const back = document.getElementById(type + "Back");
 
@@ -149,8 +149,21 @@ function toggleDashCard(type) {
 
   const showingFront = front.style.display !== "none";
 
-  front.style.display = showingFront ? "none" : "block";
-  back.style.display = showingFront ? "block" : "none";
+  const hide = showingFront ? front : back;
+  const show = showingFront ? back : front;
+
+  hide.style.opacity = "0";
+
+  setTimeout(() => {
+    hide.style.display = "none";
+
+    show.style.display = "block";
+    show.style.opacity = "0";
+
+    requestAnimationFrame(() => {
+      show.style.opacity = "1";
+    });
+  }, 150);
 }
 function showTab(tabId) {
   document.querySelectorAll(".tab-content").forEach(tab => {
@@ -285,6 +298,27 @@ document.addEventListener("mouseup", event => {
     currentIndex > 0
   ) {
     showTab(tabOrder[currentIndex - 1]);
+  }
+});
+
+function updateSaveButtonState() {
+  const name = document.getElementById("name").value.trim();
+  const amount = document.getElementById("amount").value;
+  const date = document.getElementById("date").value;
+  const saveButton = document.getElementById("saveButton");
+
+  if (!saveButton) return;
+
+  const formIsValid = name && amount && date;
+
+  saveButton.disabled = !formIsValid;
+}
+
+["name", "amount", "date"].forEach(id => {
+  const input = document.getElementById(id);
+
+  if (input) {
+    input.addEventListener("input", updateSaveButtonState);
   }
 });
 
@@ -500,6 +534,8 @@ function clearInputs() {
   document.getElementById("date").value = "";
   document.getElementById("repeat").value = "once";
   document.getElementById("type").value = "bill";
+
+  updateSaveButtonState();
 }
 
 function getSkipKey(itemId, dateObj) {
@@ -927,9 +963,16 @@ activeForecast.forEach(item => {
   }
 });
 
-  lowestEl.innerText = lowest
+ lowestEl.innerText = lowest
+  ? formatMoney(lowest.balance)
+  : formatMoney(startingBalance);
+
+const lowestBackValue = document.getElementById("lowestBackValue");
+if (lowestBackValue) {
+  lowestBackValue.innerText = lowest
     ? formatMoney(lowest.balance)
     : formatMoney(startingBalance);
+}
   window.lowestForecastItem = lowest;
   console.log("Lowest card updated:", lowest);
 
@@ -937,6 +980,11 @@ activeForecast.forEach(item => {
   const playMoney = Math.max(0, lowest.balance - buffer);
 
 monthlyEl.innerText = formatMoney(playMoney);
+
+const playMoneyBackValue = document.getElementById("playMoneyBackValue");
+if (playMoneyBackValue) {
+  playMoneyBackValue.innerText = formatMoney(playMoney);
+}
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -1670,35 +1718,97 @@ function displayDeletedItems() {
     return;
   }
 
-  div.innerHTML = deletedItems.map(item => `
-    <div class="upcoming-row">
-      <div class="upcoming-left">
-        <div class="upcoming-date">
-          Deleted ${formatShortDate(new Date(item.deletedAt))}
+div.innerHTML = deletedItems.map(item => `
+  <div class="deleted-row">
+    <input
+      type="checkbox"
+      class="bulk-checkbox"
+      ${selectedDeletedItems.has(item.id) ? "checked" : ""}
+      onchange="toggleDeletedSelection(${item.id})"
+    >
+
+    <div class="deleted-content">
+      <div class="deleted-main">
+        <div>
+          <div class="deleted-name">${item.name}</div>
+          <div class="upcoming-date">
+            Deleted ${formatShortDate(new Date(item.deletedAt))}
+          </div>
         </div>
-        <div>${item.name}</div>
+
+        <span class="${item.amount >= 0 ? "money-in" : "money-out"}">
+          ${formatMoney(item.amount)}
+        </span>
       </div>
-      <div class="upcoming-actions">
-  <span class="${item.amount >= 0 ? "money-in" : "money-out"}">
-    ${formatMoney(item.amount)}
-  </span>
 
- <button
-  class="restore compact-action"
-  onclick="restoreDeletedItem(${item.id})"
->
-  Restore
-</button>
+      <div class="deleted-actions">
+        <button class="restore compact-action" onclick="restoreDeletedItem(${item.id})">
+          Restore
+        </button>
 
-<button
-  class="delete compact-action"
-  onclick="permanentlyDeleteItem(${item.id})"
->
-  Delete Forever
-</button>
-</div>
+        <button class="delete compact-action" onclick="permanentlyDeleteItem(${item.id})">
+          Delete Forever
+        </button>
+      </div>
     </div>
-  `).join("");
+  </div>
+`).join("");
+  updateDeletedBulkActions();
+}
+function updateDeletedBulkActions() {
+  const count = selectedDeletedItems.size;
+
+  const restoreBtn = document.getElementById("restoreSelectedBtn");
+  const deleteBtn = document.getElementById("deleteSelectedBtn");
+
+  if (restoreBtn) {
+    restoreBtn.textContent = `Restore (${count})`;
+    restoreBtn.disabled = count === 0;
+  }
+
+  if (deleteBtn) {
+    deleteBtn.textContent = `Delete Forever (${count})`;
+     deleteBtn.disabled = count === 0;
+  }
+}
+function toggleDeletedSelection(id) {
+  if (selectedDeletedItems.has(id)) {
+    selectedDeletedItems.delete(id);
+  } else {
+    selectedDeletedItems.add(id);
+  }
+updateDeletedBulkActions();
+}
+
+function toggleSelectAllDeleted() {
+  const checkbox = document.getElementById("selectAllDeleted");
+
+  selectedDeletedItems.clear();
+
+  if (checkbox.checked) {
+    deletedItems.forEach(item => {
+      selectedDeletedItems.add(item.id);
+    });
+  }
+
+  displayDeletedItems();
+  updateDeletedBulkActions();
+}
+
+function restoreSelectedDeletedItems() {
+  if (selectedDeletedItems.size === 0) return;
+
+  const idsToRestore = [...selectedDeletedItems];
+
+  idsToRestore.forEach(id => {
+    restoreDeletedItem(id);
+  });
+
+  selectedDeletedItems.clear();
+  updateDeletedBulkActions();
+
+  const selectAll = document.getElementById("selectAllDeleted");
+  if (selectAll) selectAll.checked = false;
 }
 
 function permanentlyDeleteItem(id) {
@@ -1709,7 +1819,28 @@ function permanentlyDeleteItem(id) {
   saveItems();
   calculate();
 }
+function deleteSelectedForever() {
+  const count = selectedDeletedItems.size;
 
+  if (!count) return;
+
+  if (
+    !confirm(`Delete ${count} item${count === 1 ? "" : "s"} forever? This cannot be undone.`)
+  ) return;
+
+  deletedItems = deletedItems.filter(
+    item => !selectedDeletedItems.has(item.id)
+  );
+
+  selectedDeletedItems.clear();
+
+  saveDeletedItems();
+  displayDeletedItems();
+  updateDeletedBulkActions();
+
+  const selectAll = document.getElementById("selectAllDeleted");
+  if (selectAll) selectAll.checked = false;
+}
 function toggleDeletedItems() {
   const panel = document.getElementById("deletedItemsPanel");
   const toggle = document.getElementById("deletedItemsToggle");

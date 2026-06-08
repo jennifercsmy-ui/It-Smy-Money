@@ -496,26 +496,31 @@ function cancelEdit() {
 
 
 function deleteItem(id) {
-  if (!confirm("Delete this item?")) return;
+  showConfirmModal(
+    "Delete this item?",
+    () => {
+      const itemToDelete = items.find(item => item.id === id);
 
-  const itemToDelete = items.find(item => item.id === id);
+      if (itemToDelete) {
+        deletedItems.push({
+          ...itemToDelete,
+          deletedAt: new Date().toISOString()
+        });
 
-  if (itemToDelete) {
-    deletedItems.push({
-      ...itemToDelete,
-      deletedAt: new Date().toISOString()
-    });
+        saveDeletedItems();
+      }
 
-    saveDeletedItems();
-  }
+      items = items.filter(item => item.id !== id);
+      skippedEvents = skippedEvents.filter(skip => skip.itemId !== id);
 
-  items = items.filter(item => item.id !== id);
-  skippedEvents = skippedEvents.filter(skip => skip.itemId !== id);
+      saveItems();
+      saveSkippedEvents();
 
-  saveItems();
-  saveSkippedEvents();
+      calculate();
+    }
+  );
 
-  calculate();
+  return;
 }
 
 function saveItems() {
@@ -1878,6 +1883,31 @@ function deleteSelectedForever() {
   const selectAll = document.getElementById("selectAllDeleted");
   if (selectAll) selectAll.checked = false;
 }
+
+let confirmCallback = null;
+
+function showConfirmModal(message, callback) {
+  console.log("modal called");
+
+  document.getElementById("confirmMessage").textContent = message;
+
+  confirmCallback = callback;
+
+  document.getElementById("confirmModal").classList.add("show");
+}
+
+function closeConfirmModal() {
+  document.getElementById("confirmModal").classList.remove("show");
+}
+
+document.getElementById("confirmOkButton").addEventListener("click", () => {
+  if (confirmCallback) {
+    confirmCallback();
+  }
+
+  closeConfirmModal();
+});
+
 function toggleDeletedItems() {
   const panel = document.getElementById("deletedItemsPanel");
   const toggle = document.getElementById("deletedItemsToggle");

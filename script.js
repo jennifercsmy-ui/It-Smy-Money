@@ -9,6 +9,7 @@ let currentCalendarDate = new Date();
 let selectedCalendarDate = null;
 let returnToCalendarAfterEdit = false;
 let returnToForecastAfterEdit = false;
+let returnToSettingsAfterEdit = false;
 let currentOverviewForecast = [];
 let deletedItems =
   JSON.parse(localStorage.getItem("cashForecastDeletedItems")) || [];
@@ -19,6 +20,8 @@ let pinnedChartSelection = false;
 let pendingHistoryUndo = null;
 let processedEarlyItems = JSON.parse(localStorage.getItem("processedEarlyItems")) || [];
 let selectedDeletedItems = new Set();
+let pendingRecurringEdit = null;
+let recurringEditMode = null;
 
 const balanceInput = document.getElementById("balance");
 const bufferInput = document.getElementById("buffer");
@@ -306,6 +309,10 @@ function updateSaveButtonState() {
   const amount = document.getElementById("amount").value;
   const date = document.getElementById("date").value;
   const saveButton = document.getElementById("saveButton");
+const endType = document.getElementById("endType").value || "never";
+const endDate = document.getElementById("endDate").value || "";
+const endCount = parseInt(document.getElementById("endCount").value) || "";
+
 
   if (!saveButton) return;
 
@@ -343,13 +350,125 @@ const customInterval =
 
 const customUnit =
   document.getElementById("customUnit").value;
+  const endType = document.getElementById("endType").value || "never";
+const endDate = document.getElementById("endDate").value || "";
+const endCount = parseInt(document.getElementById("endCount").value) || "";
+  
   if (!name || isNaN(amount) || !date) {
     alert("Please fill in name, amount, and date.");
     return;
   }
 
   amount = type === "bill" ? -Math.abs(amount) : Math.abs(amount);
+if (
+  pendingRecurringEdit &&
+  recurringEditMode === "single"
+) {
+  const originalItem = items.find(
+    item => String(item.id) === String(pendingRecurringEdit.itemId)
+  );
 
+  if (!originalItem) return;
+
+  const skipKey =
+    pendingRecurringEdit.itemId + "|" + pendingRecurringEdit.dateKey;
+
+  const alreadySkipped = skippedEvents.some(
+    skip => skip.key === skipKey
+  );
+
+  if (!alreadySkipped) {
+    skippedEvents.push({
+      key: skipKey,
+      itemId: pendingRecurringEdit.itemId,
+      dateKey: pendingRecurringEdit.dateKey,
+      name: originalItem.name,
+      amount: originalItem.amount,
+      editedOccurrence: true
+    });
+  }
+
+  items.push({
+    id: Date.now(),
+    name,
+    amount,
+    type,
+    date,
+    repeat: "once",
+    customInterval: 1,
+    customUnit: "days",
+    endType: "never",
+    endDate: "",
+    endCount: ""
+  });
+
+  pendingRecurringEdit = null;
+  recurringEditMode = null;
+  editingId = null;
+
+  saveItems();
+  saveSkippedEvents();
+  clearInputs();
+  calculate();
+
+  returnToForecastAfterEdit = false;
+  showTab("forecastTab");
+  return;
+}
+if (
+  pendingRecurringEdit &&
+  recurringEditMode === "future"
+) {
+  const originalItem = items.find(
+    item => String(item.id) === String(pendingRecurringEdit.itemId)
+  );
+
+  if (!originalItem) return;
+
+  const previousDateKey = getPreviousOccurrenceDate(
+    originalItem,
+    pendingRecurringEdit.dateKey
+  );
+
+  items = items.map(item => {
+    if (String(item.id) === String(originalItem.id)) {
+      return {
+        ...item,
+        endType: previousDateKey ? "date" : "count",
+        endDate: previousDateKey || "",
+        endCount: previousDateKey ? "" : 0
+      };
+    }
+
+    return item;
+  });
+
+  items.push({
+    id: Date.now(),
+    name,
+    amount,
+    type,
+    date: pendingRecurringEdit.dateKey,
+    repeat,
+    customInterval,
+    customUnit,
+    endType,
+    endDate,
+    endCount
+  });
+
+  pendingRecurringEdit = null;
+  recurringEditMode = null;
+  editingId = null;
+
+  saveItems();
+  clearInputs();
+  calculate();
+
+  returnToForecastAfterEdit = false;
+  showTab("forecastTab");
+  return;
+}
  if (editingId !== null) {
   items = items.map(item => {
     if (item.id === editingId) {
@@ -362,6 +481,10 @@ const customUnit =
         repeat,
         customInterval,
         customUnit,
+        endType,
+        endDate,
+        endCount,
+        
         fromHistoryUndo: item.fromHistoryUndo || false
       };
     }
@@ -386,9 +509,21 @@ const customUnit =
     document.getElementById("formTitle").innerText = "Add Income or Bill";
     document.getElementById("saveButton").innerText = "Add";
     document.getElementById("cancelEditButton").style.display = "none";
-  } else {
-    items.push({ id: Date.now(), name, amount, type, date, repeat, customInterval, customUnit });
-  }
+} else {
+  items.push({
+    id: Date.now(),
+    name,
+    amount,
+    type,
+    date,
+    repeat,
+    customInterval,
+    customUnit,
+    endType,
+    endDate,
+    endCount
+  });
+}
 
 saveItems();
 clearInputs();
@@ -425,11 +560,23 @@ function editItem(id) {
 document.getElementById("customUnit").value =
   item.customUnit || "days";
 
+document.getElementById("endType").value =
+  item.endType || "never";
+
+document.getElementById("endDate").value =
+  item.endDate || "";
+
+document.getElementById("endCount").value =
+  item.endCount || "";
+
 toggleCustomRepeatFields();
+toggleEndRepeatFields();
 
   document.getElementById("formTitle").innerText = "Edit Item";
   document.getElementById("saveButton").innerText = "Save Changes";
   document.getElementById("cancelEditButton").style.display = "block";
+  document.getElementById("saveButton").disabled = false;
+document.getElementById("saveButton").classList.add("active");
 
   const formCard = document.getElementById("formTitle");
 
@@ -443,9 +590,28 @@ window.scrollTo({
   behavior: "smooth"
 });
 }
+
+function startFutureCashEdit(itemId, dateKey) {
+  const item = items.find(item => String(item.id) === String(itemId));
+  if (!item) return;
+
+  if (item.repeat === "once") {
+    editItem(item.id);
+    return;
+  }
+
+  pendingRecurringEdit = {
+    itemId: item.id,
+    dateKey
+  };
+
+  openRecurringEditModal();
+}
+
 function cancelEdit() {
   const shouldReturnToCalendar = returnToCalendarAfterEdit;
-  const shouldReturnToForecast = returnToForecastAfterEdit;
+const shouldReturnToForecast = returnToForecastAfterEdit;
+const shouldReturnToSettings = returnToSettingsAfterEdit;
 
   if (pendingHistoryUndo) {
     if (pendingHistoryUndo.removeRestoredItemOnCancel) {
@@ -477,8 +643,9 @@ function cancelEdit() {
     return;
   }
 
-  returnToCalendarAfterEdit = false;
-  returnToForecastAfterEdit = false;
+ returnToCalendarAfterEdit = false;
+returnToForecastAfterEdit = false;
+returnToSettingsAfterEdit = false;
 
   editingId = null;
   clearInputs();
@@ -488,10 +655,12 @@ function cancelEdit() {
   document.getElementById("cancelEditButton").style.display = "none";
 
   if (shouldReturnToCalendar) {
-    showTab("calendarTab");
-  } else if (shouldReturnToForecast) {
-    showTab("forecastTab");
-  }
+  showTab("calendarTab");
+} else if (shouldReturnToForecast) {
+  showTab("forecastTab");
+} else if (shouldReturnToSettings) {
+  showTab("settingsTab");
+}
 }
 
 
@@ -539,6 +708,10 @@ function clearInputs() {
   document.getElementById("date").value = "";
   document.getElementById("repeat").value = "once";
   document.getElementById("type").value = "bill";
+  document.getElementById("endType").value = "never";
+  document.getElementById("endDate").value = "";
+  document.getElementById("endCount").value = "";
+toggleEndRepeatFields();
 
   updateSaveButtonState();
 }
@@ -720,7 +893,47 @@ function addMonthsSafe(date, monthsToAdd, preferredDay) {
 
   return newDate;
 }
+function getPreviousOccurrenceDate(item, selectedDateKey) {
+  const selectedDate = new Date(selectedDateKey + "T00:00:00");
+  let itemDate = new Date(item.date + "T00:00:00");
+  const preferredMonthlyDay = itemDate.getDate();
 
+  let previousDate = null;
+  let safetyCounter = 0;
+
+  while (itemDate < selectedDate && safetyCounter < 500) {
+    safetyCounter++;
+
+    previousDate = new Date(itemDate);
+
+    if (item.repeat === "weekly") {
+      itemDate.setDate(itemDate.getDate() + 7);
+    } else if (item.repeat === "biweekly") {
+      itemDate.setDate(itemDate.getDate() + 14);
+    } else if (item.repeat === "monthly") {
+      itemDate = addMonthsSafe(itemDate, 1, preferredMonthlyDay);
+    } else if (item.repeat === "yearly") {
+      itemDate.setFullYear(itemDate.getFullYear() + 1);
+    } else if (item.repeat === "custom") {
+      const interval = item.customInterval || 1;
+      const unit = item.customUnit || "days";
+
+      if (unit === "days") {
+        itemDate.setDate(itemDate.getDate() + interval);
+      } else if (unit === "weeks") {
+        itemDate.setDate(itemDate.getDate() + interval * 7);
+      } else if (unit === "months") {
+        itemDate = addMonthsSafe(itemDate, interval, preferredMonthlyDay);
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return previousDate ? dateToKey(previousDate) : null;
+}
 function buildEventsUntil(endDate, today) {
   let events = [];
 
@@ -728,32 +941,55 @@ function buildEventsUntil(endDate, today) {
     let itemDate = new Date(item.date + "T00:00:00");
     const preferredMonthlyDay = itemDate.getDate();
     let safetyCounter = 0;
+    let occurrenceCount = 0;
+
+    const repeatEndDate = item.endDate
+      ? new Date(item.endDate + "T00:00:00")
+      : null;
 
     while (itemDate <= endDate && safetyCounter < 500) {
       safetyCounter++;
 
-if (itemDate > today) {
-  const dateKey = dateToKey(itemDate);
-  const originalKey = item.id + "|" + dateKey;
+      if (
+        item.endType === "date" &&
+        repeatEndDate &&
+       dateToKey(itemDate) > dateToKey(repeatEndDate)
+      ) {
+        break;
+      }
 
-  const processedEarly = processedEarlyItems.some(
-    processed => processed.originalKey === originalKey
-  );
+      occurrenceCount++;
 
-  if (!processedEarly) {
-    const skipped = isSkipped(item.id, itemDate);
+      if (
+        item.endType === "count" &&
+        item.endCount &&
+        occurrenceCount > item.endCount
+      ) {
+        break;
+      }
 
-    events.push({
-      itemId: item.id,
-      date: new Date(itemDate),
-      dateKey,
-      name: item.name,
-      amount: item.amount,
-      repeat: item.repeat,
-      skipped
-    });
-  }
-}
+      if (itemDate > today) {
+        const dateKey = dateToKey(itemDate);
+        const originalKey = item.id + "|" + dateKey;
+
+        const processedEarly = processedEarlyItems.some(
+          processed => processed.originalKey === originalKey
+        );
+
+        if (!processedEarly) {
+          const skipped = isSkipped(item.id, itemDate);
+
+          events.push({
+            itemId: item.id,
+            date: new Date(itemDate),
+            dateKey,
+            name: item.name,
+            amount: item.amount,
+            repeat: item.repeat,
+            skipped
+          });
+        }
+      }
 
       if (item.repeat === "once") break;
 
@@ -1831,6 +2067,15 @@ function toggleDeletedSelection(id) {
 updateDeletedBulkActions();
 }
 
+function toggleEndRepeatFields() {
+  const endType = document.getElementById("endType").value;
+  const endDate = document.getElementById("endDate");
+  const endCount = document.getElementById("endCount");
+
+  endDate.style.display = endType === "date" ? "block" : "none";
+  endCount.style.display = endType === "count" ? "block" : "none";
+}
+
 function toggleSelectAllDeleted() {
   const checkbox = document.getElementById("selectAllDeleted");
 
@@ -1921,7 +2166,68 @@ function closeConfirmModal() {
   modal.classList.remove("show");
   confirmCallback = null;
 }
+function openRecurringEditModal() {
+  const modal = document.getElementById("recurringEditModal");
+  document.body.appendChild(modal);
+  modal.classList.add("show");
 
+  console.log("recurring modal opened", modal);
+}
+
+function closeRecurringEditModal() {
+  const modal = document.getElementById("recurringEditModal");
+  modal.classList.remove("show");
+
+  pendingRecurringEdit = null;
+  recurringEditMode = null;
+}
+
+function confirmRecurringEditChoice() {
+  const choice = document.querySelector(
+    'input[name="recurringEditChoice"]:checked'
+  ).value;
+
+  recurringEditMode = choice;
+  console.log("Pending edit:", pendingRecurringEdit);
+  console.log("Recurring edit mode:", recurringEditMode);
+
+  document.getElementById("recurringEditModal").classList.remove("show");
+
+  if (!pendingRecurringEdit) return;
+
+  returnToForecastAfterEdit = true;
+
+  showTab("settingsTab");
+editItem(pendingRecurringEdit.itemId);
+
+if (recurringEditMode === "single" || recurringEditMode === "future") {
+  editingId = null;
+
+  document.getElementById("date").value = pendingRecurringEdit.dateKey;
+
+  if (recurringEditMode === "single") {
+    document.getElementById("repeat").value = "once";
+  }
+
+  toggleCustomRepeatFields();
+  toggleEndRepeatFields();
+}
+
+if (recurringEditMode === "single") {
+  editingId = null;
+
+  document.getElementById("date").value = pendingRecurringEdit.dateKey;
+  document.getElementById("repeat").value = "once";
+  toggleCustomRepeatFields();
+  toggleEndRepeatFields();
+}
+  if (recurringEditMode === "single") {
+  document.getElementById("date").value = pendingRecurringEdit.dateKey;
+  document.getElementById("repeat").value = "once";
+  toggleCustomRepeatFields();
+  toggleEndRepeatFields();
+}
+}
 document.getElementById("confirmOkButton").addEventListener("click", () => {
   const callback = confirmCallback;
 
@@ -2115,12 +2421,32 @@ function displayItems() {
     </span>
   </div>
 
-  <div class="forecast-sub-row">
-    ${formatDate(item.date)} • ${getRepeatDisplay(item)}
-  </div>
+ <div class="forecast-sub-row">
+  ${formatDate(item.date)} • ${getRepeatDisplay(item)}
+</div>
+
+<div class="forecast-sub-row small">
+  ${
+    item.endType === "date"
+      ? `Ends: ${formatDate(item.endDate)}`
+      : item.endType === "count"
+      ? `Ends after ${item.endCount} occurrences`
+      : (
+          item.repeat !== "once" &&
+          items.some(
+            other =>
+              other.name === item.name &&
+              other.repeat === item.repeat &&
+              other.date !== item.date
+          )
+        )
+      ? `From: ${formatDate(item.date)}`
+      : ""
+  }
+</div>
 
   <div class="button-row compact-buttons">
-    <button class="edit" onclick="editItemFromForecast(${item.id})">Edit</button>
+  <button class="edit" onclick="editItem(${item.id})">Edit</button>
     <button class="delete" onclick="deleteItem(${item.id})">Delete</button>
   </div>
 `;
@@ -2133,38 +2459,46 @@ function displaySkippedItems() {
   const div = document.getElementById("skippedList");
   div.innerHTML = "";
 
-  if (skippedEvents.length === 0) {
+  const visibleSkippedEvents = skippedEvents.filter(
+    skip => !skip.editedOccurrence
+  );
+
+  if (visibleSkippedEvents.length === 0) {
     div.innerHTML = "<p class='small'>No skipped items</p>";
     return;
   }
 
-  const sortedSkips = [...skippedEvents].sort((a, b) => new Date(a.dateKey) - new Date(b.dateKey));
-console.log("Skipped list:", sortedSkips);
+  const sortedSkips = [...visibleSkippedEvents].sort(
+    (a, b) => new Date(a.dateKey) - new Date(b.dateKey)
+  );
+
+  console.log("Skipped list:", sortedSkips);
+
   sortedSkips.forEach(skip => {
     const el = document.createElement("div");
     el.className = "forecast-item";
 
     el.innerHTML = `
-  <strong>${skip.name}</strong>
+      <strong>${skip.name}</strong>
 
-  <div class="forecast-sub-row">
-  Skipped: ${formatDate(skip.dateKey)} • ${formatMoney(skip.amount)}
-</div>
+      <div class="forecast-sub-row">
+        Skipped: ${formatDate(skip.dateKey)} • ${formatMoney(skip.amount)}
+      </div>
 
-  <div class="compact-buttons">
-  <button
-    class="restore compact-action"
-    onclick="restoreEvent('${skip.key}')">
-    Restore
-  </button>
+      <div class="compact-buttons">
+        <button
+          class="restore compact-action"
+          onclick="restoreEvent('${skip.key}')">
+          Restore
+        </button>
 
-  <button
-    class="delete compact-action"
-    onclick="removeSkippedEvent('${skip.key}')">
-    Remove
-  </button>
-</div>
-`;
+        <button
+          class="delete compact-action"
+          onclick="removeSkippedEvent('${skip.key}')">
+          Remove
+        </button>
+      </div>
+    `;
 
     div.appendChild(el);
   });
@@ -2291,7 +2625,7 @@ if (forecast.length === 0) {
 </div>
 
 <div class="compact-buttons">
-  <button class="edit" onclick="editItemFromForecast(${item.itemId})">Edit</button>
+ <button class="edit" onclick="editItemFromForecast(${item.itemId}, '${item.dateKey}')">Edit</button>
 
   <button class="compact-action" onclick="processEarly(${item.itemId}, '${item.dateKey}', '${escapeText(item.name)}', ${item.amount})">
     Process Early
@@ -2628,11 +2962,26 @@ function editItemFromCalendar(id) {
   
 }
 
-function editItemFromForecast(id) {
-  returnToForecastAfterEdit = true;
-  showTab("settingsTab");
-  editItem(id);
+function editItemFromForecast(id, dateKey = null) {
+  const item = items.find(item => item.id === id);
 
+  if (!item) return;
+
+  // one-time Future Cash items behave normally
+  if (item.repeat === "once") {
+    returnToForecastAfterEdit = true;
+    showTab("settingsTab");
+    editItem(id);
+    return;
+  }
+
+  // recurring Future Cash items get the choice modal
+  pendingRecurringEdit = {
+    itemId: id,
+    dateKey
+  };
+
+  openRecurringEditModal();
 }
 
 function refreshSelectedCalendarDay() {

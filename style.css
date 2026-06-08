@@ -1274,7 +1274,7 @@ color: #1D3557 !important;
   flex-shrink: 0;
 }
   
-#confirmModal {
+.modal-overlay {
   display: none;
   position: fixed;
   inset: 0;
@@ -1286,7 +1286,7 @@ color: #1D3557 !important;
   z-index: 999999;
 }
 
-#confirmModal.show {
+.modal-overlay.show {
   display: flex;
 }
 

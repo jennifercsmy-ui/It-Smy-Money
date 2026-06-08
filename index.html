@@ -3,7 +3,7 @@
 
   <head>
     <meta charset="UTF-8">
-    <title>It Smy Money v5.7.4.1</title>
+    <title>It Smy Money v5.8</title>
     <link rel="stylesheet" href="./style.css">
 
   </head>
@@ -327,6 +327,25 @@
     <option value="custom">Custom interval</option>
   </select>
 
+<div id="endRepeatSection">
+  <label>End Repeat:</label>
+  <select id="endType" onchange="toggleEndRepeatFields()">
+    <option value="never">Never</option>
+    <option value="date">On Date</option>
+    <option value="count">After X Occurrences</option>
+  </select>
+
+  <input type="date" id="endDate" style="display:none;">
+
+  <input
+    type="number"
+    id="endCount"
+    min="1"
+    placeholder="Number of occurrences"
+    style="display:none;"
+  >
+</div>
+
  <button id="saveButton" onclick="saveFormItem()" disabled>Add</button>
   <button id="cancelEditButton" class="secondary" onclick="cancelEdit()">Cancel Edit</button>
 </div>
@@ -391,8 +410,6 @@
 
 
 
-<script src="./script.js"></script>
-
 <div id="confirmModal" class="modal-overlay">
   <div class="modal-box">
     <div id="confirmMessage">Are you sure?</div>
@@ -400,6 +417,29 @@
     <div class="modal-buttons">
       <button onclick="closeConfirmModal()">Cancel</button>
       <button class="delete" id="confirmOkButton">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div id="recurringEditModal" class="modal-overlay">
+  <div class="modal-box">
+    <h3>Edit Recurring Item</h3>
+
+    <p class="small">What do you want to change?</p>
+
+    <label>
+      <input type="radio" name="recurringEditChoice" value="single" checked>
+      This occurrence only
+    </label>
+
+    <label>
+      <input type="radio" name="recurringEditChoice" value="future">
+      This and all future occurrences
+    </label>
+
+    <div class="modal-buttons">
+      <button onclick="confirmRecurringEditChoice()">Continue</button>
+      <button class="secondary" onclick="closeRecurringEditModal()">Cancel</button>
     </div>
   </div>
 </div>

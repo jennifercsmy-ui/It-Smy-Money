@@ -3,7 +3,7 @@
 
   <head>
     <meta charset="UTF-8">
-    <title>It Smy Money v5.7.4</title>
+    <title>It Smy Money v5.7.4.1</title>
     <link rel="stylesheet" href="./style.css">
 
   </head>
@@ -393,6 +393,19 @@
 
 <script src="./script.js"></script>
 
+<div id="confirmModal" class="modal-overlay">
+  <div class="modal-box">
+    <div id="confirmMessage">Are you sure?</div>
+
+    <div class="modal-buttons">
+      <button onclick="closeConfirmModal()">Cancel</button>
+      <button class="delete" id="confirmOkButton">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script src="./script.js"></script>
+
 <script>
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./service-worker.js", {
@@ -401,23 +414,10 @@
   }
 </script>
 
-<div id="confirmModal" class="modal-overlay">
-  <div class="modal-box">
-    <div id="confirmMessage">
-      Are you sure?
-    </div>
-
-    <div class="modal-buttons">
-      <button onclick="closeConfirmModal()">
-        Cancel
-      </button>
-
-      <button class="delete" id="confirmOkButton">
-        Confirm
-      </button>
-    </div>
-  </div>
-</div>
-
 </body>
+</html>
+    <script  src="./script.js"></script>
+
+  </body>
+  
 </html>

@@ -557,57 +557,61 @@ function isSkipped(itemId, dateObj) {
 }
 
 function processEarly(itemId, dateKey, name, amount) {
-  if (!confirm("Process this item today?\n\nYour current balance will update now, and the original future date will be marked as processed early.")) return;
+  showConfirmModal(
+    "Process this item today? Your current balance will update now, and the original future date will be marked as processed early.",
+    () => {
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-  const todayKey = dateToKey(today);
-  const originalKey = itemId + "|" + dateKey;
-  const processedEarlyKey = itemId + "|" + todayKey + "|early|" + dateKey;
+      const todayKey = dateToKey(today);
+      const originalKey = itemId + "|" + dateKey;
+      const processedEarlyKey = itemId + "|" + todayKey + "|early|" + dateKey;
 
-  const alreadyProcessed = processedEarlyItems.some(
-    item => item.originalKey === originalKey
+      const alreadyProcessed = processedEarlyItems.some(
+        item => item.originalKey === originalKey
+      );
+
+      if (alreadyProcessed) {
+        alert("This item was already processed early.");
+        return;
+      }
+
+      const currentBalance = parseFloat(balanceInput.value) || 0;
+      balanceInput.value = (currentBalance + amount).toFixed(2);
+      localStorage.setItem("cashForecastBalance", balanceInput.value);
+
+      processedEarlyItems.push({
+        key: processedEarlyKey,
+        originalKey,
+        itemId,
+        originalDateKey: dateKey,
+        processedDateKey: todayKey,
+        name,
+        amount,
+        loggedAt: new Date().toISOString()
+      });
+
+      historyItems.push({
+        itemId,
+        date: today,
+        dateKey: todayKey,
+        name,
+        amount,
+        repeat: "once",
+        skipped: false,
+        processedEarly: true,
+        originalDateKey: dateKey,
+        historyKey: processedEarlyKey,
+        loggedAt: new Date().toISOString()
+      });
+
+      saveItems();
+      saveHistoryItems();
+      saveProcessedEarlyItems();
+      calculate();
+    }
   );
-
-  if (alreadyProcessed) {
-    alert("This item was already processed early.");
-    return;
-  }
-
-  const currentBalance = parseFloat(balanceInput.value) || 0;
-  balanceInput.value = (currentBalance + amount).toFixed(2);
-  localStorage.setItem("cashForecastBalance", balanceInput.value);
-
-  processedEarlyItems.push({
-    key: processedEarlyKey,
-    originalKey,
-    itemId,
-    originalDateKey: dateKey,
-    processedDateKey: todayKey,
-    name,
-    amount,
-    loggedAt: new Date().toISOString()
-  });
-
-  historyItems.push({
-    itemId,
-    date: today,
-    dateKey: todayKey,
-    name,
-    amount,
-    repeat: "once",
-    skipped: false,
-    processedEarly: true,
-    originalDateKey: dateKey,
-    historyKey: processedEarlyKey,
-    loggedAt: new Date().toISOString()
-  });
-
-  saveItems();
-  saveHistoryItems();
-  saveProcessedEarlyItems();
-  calculate();
 }
 
 function skipEvent(itemId, dateKey, name, amount = 0) {
@@ -669,30 +673,35 @@ calculate();
 refreshSelectedCalendarDay();
 }
 function removeSkippedEvent(key) {
-  const skip = skippedEvents.find(skip => skip.key === key);
-  if (!skip) return;
 
-  if (!confirm("Remove this skipped item? It will move to Deleted Items.")) return;
+  const skipToRemove = skippedEvents.find(item => item.key === key);
+  console.log("skipToRemove:", skipToRemove);
+  if (!skipToRemove) return;
+  
 
-  deletedItems.push({
-  id: Date.now(),
-  itemId: skip.itemId,
-  name: skip.name,
-  amount: skip.amount,
-  date: skip.dateKey,
-  repeat: "once",
-  deletedAt: new Date().toISOString(),
-  deletedFrom: "skipped",
-  skipKey: skip.key
-});
+  showConfirmModal(
+    "Remove this skipped item? It will move to Deleted Items.",
+    () => {
+      deletedItems.push({
+        id: Date.now(),
+        itemId: skipToRemove.itemId,
+        name: skipToRemove.name,
+        amount: skipToRemove.amount,
+        date: skipToRemove.dateKey,
+        repeat: "once",
+        deletedAt: new Date().toISOString(),
+        deletedFrom: "skipped",
+        skipKey: skipToRemove.key
+      });
 
-  skippedEvents = skippedEvents.filter(skip => skip.key !== key);
+      skippedEvents = skippedEvents.filter(item => item.key !== key);
 
-  saveDeletedItems();
-  saveSkippedEvents();
-
-  calculate();
-  refreshSelectedCalendarDay();
+      saveDeletedItems();
+      saveSkippedEvents();
+      calculate();
+      refreshSelectedCalendarDay();
+    }
+  );
 }
 function addMonthsSafe(date, monthsToAdd, preferredDay) {
   const targetDay = preferredDay || date.getDate();
@@ -1854,34 +1863,40 @@ function restoreSelectedDeletedItems() {
 }
 
 function permanentlyDeleteItem(id) {
-  if (!confirm("Permanently delete this item?")) return;
+  console.log("permanent delete modal");
 
-  deletedItems = deletedItems.filter(item => item.id !== id);
+  showConfirmModal(
+    "Permanently delete this item?",
+    () => {
+      deletedItems = deletedItems.filter(item => item.id !== id);
 
-  saveItems();
-  calculate();
+      saveDeletedItems();
+      calculate();
+    }
+  );
 }
 function deleteSelectedForever() {
   const count = selectedDeletedItems.size;
 
   if (!count) return;
 
-  if (
-    !confirm(`Delete ${count} item${count === 1 ? "" : "s"} forever? This cannot be undone.`)
-  ) return;
+  showConfirmModal(
+    `Delete ${count} item${count === 1 ? "" : "s"} forever? This cannot be undone.`,
+    () => {
+      deletedItems = deletedItems.filter(
+        item => !selectedDeletedItems.has(item.id)
+      );
 
-  deletedItems = deletedItems.filter(
-    item => !selectedDeletedItems.has(item.id)
+      selectedDeletedItems.clear();
+
+      saveDeletedItems();
+      displayDeletedItems();
+      updateDeletedBulkActions();
+
+      const selectAll = document.getElementById("selectAllDeleted");
+      if (selectAll) selectAll.checked = false;
+    }
   );
-
-  selectedDeletedItems.clear();
-
-  saveDeletedItems();
-  displayDeletedItems();
-  updateDeletedBulkActions();
-
-  const selectAll = document.getElementById("selectAllDeleted");
-  if (selectAll) selectAll.checked = false;
 }
 
 let confirmCallback = null;
@@ -1889,23 +1904,32 @@ let confirmCallback = null;
 function showConfirmModal(message, callback) {
   console.log("modal called");
 
+  const modal = document.getElementById("confirmModal");
+
+  document.body.appendChild(modal);
+
   document.getElementById("confirmMessage").textContent = message;
 
   confirmCallback = callback;
 
-  document.getElementById("confirmModal").classList.add("show");
+  modal.classList.add("show");
 }
 
 function closeConfirmModal() {
-  document.getElementById("confirmModal").classList.remove("show");
+  const modal = document.getElementById("confirmModal");
+
+  modal.classList.remove("show");
+  confirmCallback = null;
 }
 
 document.getElementById("confirmOkButton").addEventListener("click", () => {
-  if (confirmCallback) {
-    confirmCallback();
-  }
+  const callback = confirmCallback;
 
   closeConfirmModal();
+
+  if (callback) {
+    callback();
+  }
 });
 
 function toggleDeletedItems() {
@@ -2419,12 +2443,11 @@ window.importBackup = function(event) {
 
   if (!file) return;
 
-  if (!confirm("Import this backup? This will replace your current saved data.")) {
-    event.target.value = "";
-    return;
-  }
+  showConfirmModal(
+    "Import this backup? This will replace your current saved data.",
+    () => {
 
-  const reader = new FileReader();
+      const reader = new FileReader();
 
   reader.onload = function(e) {
     try {
@@ -2445,8 +2468,10 @@ window.importBackup = function(event) {
 
   
   
-  reader.readAsText(file);
-};
+      reader.readAsText(file);
+    }
+  );
+}
 
 function renderCalendar(forecast = []) {
 

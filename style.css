@@ -291,27 +291,6 @@ z-index: 2;
   background: transparent;
 }
 
-.modal-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.45);
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.modal-overlay.show {
-  display: flex;
-}
-
-.modal-box {
-  background: white;
-  padding: 20px;
-  border-radius: 12px;
-  width: min(320px, 90%);
-  text-align: center;
-}
 
 .modal-buttons {
   display: flex;
@@ -1293,6 +1272,31 @@ color: #1D3557 !important;
   width: auto;
   margin-top: 4px;
   flex-shrink: 0;
+}
+  
+#confirmModal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.45);
+  align-items: center;
+  justify-content: center;
+  z-index: 999999;
+}
+
+#confirmModal.show {
+  display: flex;
+}
+
+.modal-box {
+  background: white;
+  color: #1D3557;
+  padding: 20px;
+  border-radius: 16px;
+  width: min(320px, 90vw);
+  text-align: center;
 }
   
 }

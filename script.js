@@ -10,6 +10,9 @@ let selectedCalendarDate = null;
 let returnToCalendarAfterEdit = false;
 let returnToForecastAfterEdit = false;
 let returnToSettingsAfterEdit = false;
+let returnToNonNegotiablesAfterEdit = false;
+let returnAfterEditTab = null;
+let returnAfterEditScrollTarget = null;
 let currentOverviewForecast = [];
 let deletedItems =
   JSON.parse(localStorage.getItem("cashForecastDeletedItems")) || [];
@@ -544,9 +547,11 @@ if (returnToForecastAfterEdit) {
 }
 
 function editItem(id) {
+  
+
   const item = items.find(item => item.id === id);
   if (!item) return;
-
+ 
   editingId = id;
 
   document.getElementById("name").value = item.name;
@@ -609,14 +614,10 @@ function startFutureCashEdit(itemId, dateKey) {
 }
 
 function cancelEdit() {
-  const shouldReturnToCalendar = returnToCalendarAfterEdit;
-const shouldReturnToForecast = returnToForecastAfterEdit;
-const shouldReturnToSettings = returnToSettingsAfterEdit;
-
   if (pendingHistoryUndo) {
     if (pendingHistoryUndo.removeRestoredItemOnCancel) {
-  items = items.filter(item => item.id !== pendingHistoryUndo.restoredItemId);
-}
+      items = items.filter(item => item.id !== pendingHistoryUndo.restoredItemId);
+    }
 
     const alreadyBackInHistory = historyItems.some(
       item => item.historyKey === pendingHistoryUndo.originalHistoryItem.historyKey
@@ -643,10 +644,6 @@ const shouldReturnToSettings = returnToSettingsAfterEdit;
     return;
   }
 
- returnToCalendarAfterEdit = false;
-returnToForecastAfterEdit = false;
-returnToSettingsAfterEdit = false;
-
   editingId = null;
   clearInputs();
 
@@ -654,16 +651,26 @@ returnToSettingsAfterEdit = false;
   document.getElementById("saveButton").innerText = "Add";
   document.getElementById("cancelEditButton").style.display = "none";
 
-  if (shouldReturnToCalendar) {
-  showTab("calendarTab");
-} else if (shouldReturnToForecast) {
-  showTab("forecastTab");
-} else if (shouldReturnToSettings) {
-  showTab("settingsTab");
-}
-}
+  if (returnAfterEditTab) {
+    showTab(returnAfterEditTab);
 
+    if (returnAfterEditScrollTarget) {
+      setTimeout(() => {
+        const target = document.getElementById(returnAfterEditScrollTarget);
 
+        if (target) {
+          target.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+          });
+        }
+      }, 100);
+    }
+
+    returnAfterEditTab = null;
+    returnAfterEditScrollTarget = null;
+  }
+}  
 function deleteItem(id) {
   showConfirmModal(
     "Delete this item?",
@@ -2188,45 +2195,29 @@ function confirmRecurringEditChoice() {
   ).value;
 
   recurringEditMode = choice;
-  console.log("Pending edit:", pendingRecurringEdit);
-  console.log("Recurring edit mode:", recurringEditMode);
 
   document.getElementById("recurringEditModal").classList.remove("show");
 
   if (!pendingRecurringEdit) return;
 
-  returnToForecastAfterEdit = true;
+  returnAfterEditTab = "forecastTab";
+returnAfterEditScrollTarget = null;
 
   showTab("settingsTab");
-editItem(pendingRecurringEdit.itemId);
+  editItem(pendingRecurringEdit.itemId);
 
-if (recurringEditMode === "single" || recurringEditMode === "future") {
-  editingId = null;
+  if (recurringEditMode === "single" || recurringEditMode === "future") {
+    editingId = null;
 
-  document.getElementById("date").value = pendingRecurringEdit.dateKey;
+    document.getElementById("date").value = pendingRecurringEdit.dateKey;
 
-  if (recurringEditMode === "single") {
-    document.getElementById("repeat").value = "once";
+    if (recurringEditMode === "single") {
+      document.getElementById("repeat").value = "once";
+    }
+
+    toggleCustomRepeatFields();
+    toggleEndRepeatFields();
   }
-
-  toggleCustomRepeatFields();
-  toggleEndRepeatFields();
-}
-
-if (recurringEditMode === "single") {
-  editingId = null;
-
-  document.getElementById("date").value = pendingRecurringEdit.dateKey;
-  document.getElementById("repeat").value = "once";
-  toggleCustomRepeatFields();
-  toggleEndRepeatFields();
-}
-  if (recurringEditMode === "single") {
-  document.getElementById("date").value = pendingRecurringEdit.dateKey;
-  document.getElementById("repeat").value = "once";
-  toggleCustomRepeatFields();
-  toggleEndRepeatFields();
-}
 }
 document.getElementById("confirmOkButton").addEventListener("click", () => {
   const callback = confirmCallback;
@@ -2446,7 +2437,7 @@ function displayItems() {
 </div>
 
   <div class="button-row compact-buttons">
-  <button class="edit" onclick="editItem(${item.id})">Edit</button>
+  <button class="edit" onclick="editItemFromNonNegotiables(${item.id})">Edit</button>
     <button class="delete" onclick="deleteItem(${item.id})">Delete</button>
   </div>
 `;
@@ -2961,7 +2952,16 @@ function editItemFromCalendar(id) {
   editItem(id);
   
 }
+function editItemFromNonNegotiables(id) {
+  pendingRecurringEdit = null;
+  recurringEditMode = null;
 
+  returnAfterEditTab = "forecastTab";
+  returnAfterEditScrollTarget = "itemsList";
+
+  showTab("settingsTab");
+  editItem(id);
+}
 function editItemFromForecast(id, dateKey = null) {
   const item = items.find(item => item.id === id);
 
@@ -2969,7 +2969,9 @@ function editItemFromForecast(id, dateKey = null) {
 
   // one-time Future Cash items behave normally
   if (item.repeat === "once") {
-    returnToForecastAfterEdit = true;
+    returnAfterEditTab = "forecastTab";
+    returnAfterEditScrollTarget = null;
+
     showTab("settingsTab");
     editItem(id);
     return;

@@ -2697,7 +2697,7 @@ function escapeText(text) {
 }
 function exportBackup() {
   const backup = {
-    version: "1.0",
+    version: "1.1",
     exportedAt: new Date().toISOString(),
     appName: "It Smy Money",
     settings: {
@@ -2705,15 +2705,13 @@ function exportBackup() {
       buffer: localStorage.getItem("cashForecastBuffer") || "",
       range: localStorage.getItem("cashForecastRange") || "30"
     },
-    items: items,
-    skippedEvents: skippedEvents
+    items,
+    skippedEvents,
+    historyItems,
+    deletedItems,
+    processedEarlyItems
   };
 
-  
-  
-  
-  
-  
   const data = JSON.stringify(backup, null, 2);
   const blob = new Blob([data], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -2829,7 +2827,10 @@ window.importBackup = function(event) {
       localStorage.setItem("cashForecastRange", backup.settings?.range || "30");
 
       localStorage.setItem("cashForecastItems", JSON.stringify(backup.items || []));
-      localStorage.setItem("cashForecastSkippedEvents", JSON.stringify(backup.skippedEvents || []));
+localStorage.setItem("cashForecastSkippedEvents", JSON.stringify(backup.skippedEvents || []));
+localStorage.setItem("cashForecastHistoryItems", JSON.stringify(backup.historyItems || []));
+localStorage.setItem("cashForecastDeletedItems", JSON.stringify(backup.deletedItems || []));
+localStorage.setItem("cashForecastProcessedEarlyItems", JSON.stringify(backup.processedEarlyItems || []));
 
       location.reload();
     } catch (error) {

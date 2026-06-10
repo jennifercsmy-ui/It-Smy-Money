@@ -1078,47 +1078,13 @@ function calculate() {
   displayItems();
   displaySkippedItems();
   displayDeletedItems();
-  displayItems();
-displaySkippedItems();
-displayDeletedItems();
 displayCalendarHistory();
 
-let balance = parseFloat(balanceInput.value) || 0;
-let buffer = parseFloat(bufferInput.value) || 0;
 
-let rangeDays = window.rangeDays || parseInt(rangeInput.value) || 30;
-window.rangeDays = rangeDays;
   
 
   const today = new Date();
   today.setHours(0,0,0,0);
-
-  const endDate = new Date(today);
-  endDate.setDate(endDate.getDate() + rangeDays);
-
-  let events = buildEventsUntil(endDate, today);
-
-const overviewEndDate = new Date(today);
-overviewEndDate.setDate(overviewEndDate.getDate() + 90);
-
-let overviewEvents = buildEventsUntil(overviewEndDate, today);
-
- 
-
-  let forecast = [];
-  let runningBalance = balance;
-
-  events.forEach(event => {
-    if (!event.skipped) {
-      runningBalance += event.amount;
-    }
-
-    forecast.push({
-      ...event,
-      balance: runningBalance
-    });
-  });
-
 items.forEach(item => {
   let itemDate = new Date(item.date + "T00:00:00");
   itemDate.setHours(0, 0, 0, 0);
@@ -1163,6 +1129,40 @@ if (itemDate <= todayCopy && !alreadyLogged && !alreadyDeleted && !alreadySkippe
     localStorage.setItem("cashForecastBalance", balanceInput.value);
   }
 });
+  let balance = parseFloat(balanceInput.value) || 0;
+let buffer = parseFloat(bufferInput.value) || 0;
+
+let rangeDays = window.rangeDays || parseInt(rangeInput.value) || 30;
+window.rangeDays = rangeDays;
+
+
+  const endDate = new Date(today);
+  endDate.setDate(endDate.getDate() + rangeDays);
+
+  let events = buildEventsUntil(endDate, today);
+
+const overviewEndDate = new Date(today);
+overviewEndDate.setDate(overviewEndDate.getDate() + 90);
+
+let overviewEvents = buildEventsUntil(overviewEndDate, today);
+
+ 
+
+  let forecast = [];
+  let runningBalance = balance;
+
+  events.forEach(event => {
+    if (!event.skipped) {
+      runningBalance += event.amount;
+    }
+
+    forecast.push({
+      ...event,
+      balance: runningBalance
+    });
+  });
+
+
 
 const todayFilter = new Date();
 todayFilter.setHours(0, 0, 0, 0);

@@ -3,6 +3,7 @@ let skippedEvents = JSON.parse(localStorage.getItem("cashForecastSkippedEvents")
 let editingId = null;
 let chartPoints = [];
 let selectedChartIndex = null;
+let selectedChartDateKey = null;
 let currentForecast = [];
 let currentStartingBalance = 0;
 let currentCalendarDate = new Date();
@@ -180,12 +181,10 @@ function showTab(tabId) {
     button.classList.remove("active");
   });
 
-  document.getElementById(tabId).classList.add("active-tab");
-  
-  setTimeout(() => {
-  drawChart(currentForecast, currentStartingBalance, "balanceChart");
-  drawChart(currentOverviewForecast, currentStartingBalance, "overviewChart");
-}, 50);
+  const selectedTab = document.getElementById(tabId);
+  if (!selectedTab) return;
+
+  selectedTab.classList.add("active-tab");
 
   const matchingButton = document.querySelector(
     `.tab-button[onclick="showTab('${tabId}')"]`
@@ -194,6 +193,20 @@ function showTab(tabId) {
   if (matchingButton) {
     matchingButton.classList.add("active");
   }
+
+  requestAnimationFrame(() => {
+    if (tabId === "forecastTab") {
+      drawChart(currentForecast, currentStartingBalance, "balanceChart");
+    }
+
+    if (tabId === "overviewTab") {
+      drawChart(currentOverviewForecast, currentStartingBalance, "overviewChart");
+    }
+
+    if (tabId === "calendarTab") {
+      refreshSelectedCalendarDay();
+    }
+  });
 }
 
 const tabOrder = [
@@ -405,14 +418,11 @@ if (
     endCount: ""
   });
 
-  pendingRecurringEdit = null;
-  recurringEditMode = null;
-  editingId = null;
-
   saveItems();
-  saveSkippedEvents();
-  clearInputs();
-  calculate();
+saveSkippedEvents();
+clearInputs();
+resetFormEditState();
+calculate();
 
   returnToForecastAfterEdit = false;
   showTab("forecastTab");
@@ -460,13 +470,10 @@ if (
     endCount
   });
 
-  pendingRecurringEdit = null;
-  recurringEditMode = null;
-  editingId = null;
-
   saveItems();
-  clearInputs();
-  calculate();
+clearInputs();
+resetFormEditState();
+calculate();
 
   returnToForecastAfterEdit = false;
   showTab("forecastTab");
@@ -508,10 +515,7 @@ if (
   pendingHistoryUndo = null;
 }
 
-  editingId = null;
-    document.getElementById("formTitle").innerText = "Add Income or Bill";
-    document.getElementById("saveButton").innerText = "Add";
-    document.getElementById("cancelEditButton").style.display = "none";
+ resetFormEditState();
 } else {
   items.push({
     id: Date.now(),
@@ -594,6 +598,16 @@ window.scrollTo({
   top: y,
   behavior: "smooth"
 });
+}
+
+function resetFormEditState() {
+  editingId = null;
+  pendingRecurringEdit = null;
+  recurringEditMode = null;
+
+  document.getElementById("formTitle").innerText = "Add Income or Bill";
+  document.getElementById("saveButton").innerText = "Add";
+  document.getElementById("cancelEditButton").style.display = "none";
 }
 
 function startFutureCashEdit(itemId, dateKey) {
@@ -853,11 +867,9 @@ calculate();
 refreshSelectedCalendarDay();
 }
 function removeSkippedEvent(key) {
-
   const skipToRemove = skippedEvents.find(item => item.key === key);
   console.log("skipToRemove:", skipToRemove);
   if (!skipToRemove) return;
-  
 
   showConfirmModal(
     "Remove this skipped item? It will move to Deleted Items.",
@@ -874,12 +886,17 @@ function removeSkippedEvent(key) {
         skipKey: skipToRemove.key
       });
 
-      skippedEvents = skippedEvents.filter(item => item.key !== key);
-
+      // IMPORTANT:
+      // Do NOT remove from skippedEvents here.
+      // The skippedEvents record is the blocker that keeps this occurrence
+      // out of Forecast / Growing / Shrinking.
+      
       saveDeletedItems();
       saveSkippedEvents();
       calculate();
       refreshSelectedCalendarDay();
+      displaySkippedItems();
+displayDeletedItems();
     }
   );
 }
@@ -1336,20 +1353,22 @@ if (playMoneyBackValue) {
 }
 
 function jumpToLowestBalance() {
-  if (!chartPoints || chartPoints.length === 0) return;
+  if (!currentForecast || currentForecast.length === 0) return;
 
-  const lowestPoint = chartPoints
+  const lowestPoint = currentForecast
     .filter(point => !point.isRangeEnd)
     .reduce((lowest, point) => {
       if (!lowest || point.balance < lowest.balance) {
         return point;
       }
+
       return lowest;
     }, null);
 
   if (!lowestPoint) return;
 
-  selectedChartIndex = lowestPoint.index;
+  selectedChartDateKey = lowestPoint.dateKey;
+  selectedChartIndex = null;
   pinnedChartSelection = true;
 
   clearTimeout(scrubberTimeout);
@@ -1683,7 +1702,13 @@ points.forEach((point, i) => {
   const px = x(i);
   const py = y(point.balance);
 
-  const isSelected = selectedChartIndex === i && canvasId === "balanceChart";
+  const isSelected =
+  canvasId === "balanceChart" &&
+  (
+    selectedChartDateKey
+      ? point.dateKey === selectedChartDateKey
+      : selectedChartIndex === i
+  );
   const isLowest = point.balance === lowestBalance;
   const isStart = i === 0;
   const isEnd = i === lastPointIndex;
@@ -1919,7 +1944,8 @@ ctx.fillText(
 }
 
 function handleChartTap(event) {
-  pinnedChartSelection = false;
+ pinnedChartSelection = false;
+selectedChartDateKey = null;
 
   const canvas = document.getElementById("balanceChart");
   const tooltip = document.getElementById("chartTooltip");
@@ -1945,14 +1971,16 @@ function handleChartTap(event) {
 
   if (!closest) return;
 
-  selectedChartIndex = closest.index;
+  selectedChartDateKey = closest.dateKey;
+selectedChartIndex = null;
 
   clearTimeout(scrubberTimeout);
 
   scrubberTimeout = setTimeout(() => {
     if (!pinnedChartSelection) {
       selectedChartIndex = null;
-      drawChart(currentForecast, currentStartingBalance, "balanceChart");
+selectedChartDateKey = null;
+drawChart(currentForecast, currentStartingBalance, "balanceChart");
     }
   }, 1800);
 
@@ -2450,9 +2478,15 @@ function displaySkippedItems() {
   const div = document.getElementById("skippedList");
   div.innerHTML = "";
 
-  const visibleSkippedEvents = skippedEvents.filter(
-    skip => !skip.editedOccurrence
+  const visibleSkippedEvents = skippedEvents.filter(skip => {
+  const movedToDeleted = deletedItems.some(
+    deleted =>
+      deleted.deletedFrom === "skipped" &&
+      deleted.skipKey === skip.key
   );
+
+  return !skip.editedOccurrence && !movedToDeleted;
+});
 
   if (visibleSkippedEvents.length === 0) {
     div.innerHTML = "<p class='small'>No skipped items</p>";

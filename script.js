@@ -772,8 +772,10 @@ function processEarly(itemId, dateKey, name, amount) {
       }
 
       const currentBalance = parseFloat(balanceInput.value) || 0;
-      balanceInput.value = (currentBalance + amount).toFixed(2);
-      localStorage.setItem("cashForecastBalance", balanceInput.value);
+const newBalance = currentBalance + amount;
+
+balanceInput.value = newBalance.toFixed(2);
+localStorage.setItem("cashForecastBalance", balanceInput.value);
 
       processedEarlyItems.push({
         key: processedEarlyKey,
@@ -787,18 +789,22 @@ function processEarly(itemId, dateKey, name, amount) {
       });
 
       historyItems.push({
-        itemId,
-        date: today,
-        dateKey: todayKey,
-        name,
-        amount,
-        repeat: "once",
-        skipped: false,
-        processedEarly: true,
-        originalDateKey: dateKey,
-        historyKey: processedEarlyKey,
-        loggedAt: new Date().toISOString()
-      });
+  itemId,
+  date: today,
+  dateKey: todayKey,
+  name,
+  amount,
+  repeat: "once",
+  type: amount >= 0 ? "income" : "bill",
+  customInterval: 1,
+  customUnit: "days",
+  skipped: false,
+  processedEarly: true,
+  originalDateKey: dateKey,
+  balance: newBalance,
+  historyKey: processedEarlyKey,
+  loggedAt: new Date().toISOString()
+});
 
       saveItems();
       saveHistoryItems();
@@ -2937,9 +2943,13 @@ if (dateStr <= todayKey) {
     .filter(item => item.dateKey <= dateStr)
     .slice(-1)[0];
 
-  if (lastHistoryForDay) {
-    dayBalance = lastHistoryForDay.balance;
-  } else if (sortedHistory.length > 0) {
+  if (
+  lastHistoryForDay &&
+  typeof lastHistoryForDay.balance === "number" &&
+  !isNaN(lastHistoryForDay.balance)
+) {
+  dayBalance = lastHistoryForDay.balance;
+} else if (sortedHistory.length > 0) {
     const firstHistory = sortedHistory[0];
 
     dayBalance = firstHistory.balance - firstHistory.amount;

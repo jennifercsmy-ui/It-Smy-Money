@@ -837,6 +837,11 @@ function restoreDeletedItem(id) {
   const restoredItem = deletedItems[itemIndex];
 
   if (restoredItem.deletedFrom === "skipped") {
+  const alreadySkipped = skippedEvents.some(
+    skip => skip.key === restoredItem.skipKey
+  );
+
+  if (!alreadySkipped) {
     skippedEvents.push({
       key: restoredItem.skipKey,
       itemId: restoredItem.itemId,
@@ -844,7 +849,8 @@ function restoreDeletedItem(id) {
       name: restoredItem.name,
       amount: restoredItem.amount
     });
-  } else {
+  }
+} else {
     items.push({
       ...restoredItem
     });
@@ -857,6 +863,9 @@ function restoreDeletedItem(id) {
   saveDeletedItems();
 
   calculate();
+displaySkippedItems();
+displayDeletedItems();
+refreshSelectedCalendarDay();
 }
 
 
@@ -2314,7 +2323,7 @@ function displayCalendarHistory() {
   </span>
 
   <button onclick="undoHistoryItem('${item.historyKey}')">
-    Undo
+    Undo & Edit
   </button>
 
   <button onclick="deleteHistoryItem('${item.historyKey}')">
@@ -2328,28 +2337,26 @@ function displayCalendarHistory() {
 function undoHistoryItem(historyKey) {
   const historyItem = historyItems.find(item => item.historyKey === historyKey);
   if (!historyItem) return;
+
   if (historyItem.processedEarly) {
-  const currentBalance = parseFloat(balanceInput.value) || 0;
+    const balanceBeforeUndo = parseFloat(balanceInput.value) || 0;
 
-  // Reverse the Process Early balance change
-  balanceInput.value = (currentBalance - historyItem.amount).toFixed(2);
-  localStorage.setItem("cashForecastBalance", balanceInput.value);
+    balanceInput.value = (balanceBeforeUndo - historyItem.amount).toFixed(2);
+    localStorage.setItem("cashForecastBalance", balanceInput.value);
 
-  // Remove the processed-early blocker so the original future item returns
-  processedEarlyItems = processedEarlyItems.filter(
-    item => item.key !== historyItem.historyKey
-  );
+    processedEarlyItems = processedEarlyItems.filter(
+      item => item.key !== historyItem.historyKey
+    );
 
-  // Remove the history record
-  historyItems = historyItems.filter(item => item.historyKey !== historyKey);
+    historyItems = historyItems.filter(item => item.historyKey !== historyKey);
 
-  saveProcessedEarlyItems();
-  saveHistoryItems();
-  saveItems();
-  calculate();
+    saveProcessedEarlyItems();
+    saveHistoryItems();
+    saveItems();
+    calculate();
 
-  return;
-}
+    return;
+  }
 
   const originalItemId = historyItem.itemId;
 
@@ -2380,6 +2387,11 @@ function undoHistoryItem(historyKey) {
     existingItem.repeat =
       existingItem.repeat || historyItem.repeat || "once";
   }
+
+  const balanceBeforeUndo = parseFloat(balanceInput.value) || 0;
+
+  balanceInput.value = (balanceBeforeUndo - historyItem.amount).toFixed(2);
+  localStorage.setItem("cashForecastBalance", balanceInput.value);
 
   historyItems = historyItems.filter(item => item.historyKey !== historyKey);
 
@@ -2911,22 +2923,46 @@ if (
       <div class="calendar-day-number">${day}</div>
     `;
 
-const lastEventForDay = forecast
-  .filter(item => !item.skipped && item.dateKey <= dateStr)
-  .slice(-1)[0];
+const todayKey = dateToKey(new Date());
 
-if (lastEventForDay || currentStartingBalance !== null) {
-  const dayBalance = lastEventForDay
+let dayBalance = null;
+
+if (dateStr <= todayKey) {
+  const sortedHistory = [...historyItems].sort((a, b) =>
+    new Date(a.date) - new Date(b.date)
+  );
+
+  const lastHistoryForDay = sortedHistory
+    .filter(item => item.dateKey <= dateStr)
+    .slice(-1)[0];
+
+  if (lastHistoryForDay) {
+    dayBalance = lastHistoryForDay.balance;
+  } else if (sortedHistory.length > 0) {
+    const firstHistory = sortedHistory[0];
+
+    dayBalance = firstHistory.balance - firstHistory.amount;
+  } else {
+    dayBalance = currentStartingBalance;
+  }
+} else {
+  const lastEventForDay = forecast
+    .filter(item => !item.skipped && item.dateKey <= dateStr)
+    .slice(-1)[0];
+
+  dayBalance = lastEventForDay
     ? lastEventForDay.balance
     : currentStartingBalance;
+}
 
+if (dayBalance !== null) {
   const balanceEl = document.createElement("div");
 
   balanceEl.className =
     "calendar-balance " + (dayBalance < 0 ? "bill" : "income");
 
   balanceEl.innerText =
-  "$" + Math.round(dayBalance).toLocaleString("en-CA");
+    "$" + Math.round(dayBalance).toLocaleString("en-CA");
 
   cell.appendChild(balanceEl);
 }
@@ -3023,7 +3059,10 @@ function editItemFromForecast(id, dateKey = null) {
 function refreshSelectedCalendarDay() {
   if (!selectedCalendarDate) return;
 
-  const selectedEvents = currentForecast
+  const selectedEvents = currentForecast.filter(item =>
+    item.dateKey === selectedCalendarDate &&
+    !item.isRangeEnd
+  );
 
   const selectedHistoryEvents = historyItems.filter(
     item => item.dateKey === selectedCalendarDate

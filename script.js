@@ -2345,24 +2345,63 @@ function undoHistoryItem(historyKey) {
   if (!historyItem) return;
 
   if (historyItem.processedEarly) {
-    const balanceBeforeUndo = parseFloat(balanceInput.value) || 0;
+  const balanceBeforeUndo = parseFloat(balanceInput.value) || 0;
 
-    balanceInput.value = (balanceBeforeUndo - historyItem.amount).toFixed(2);
-    localStorage.setItem("cashForecastBalance", balanceInput.value);
+  balanceInput.value = (balanceBeforeUndo - historyItem.amount).toFixed(2);
+  localStorage.setItem("cashForecastBalance", balanceInput.value);
 
-    processedEarlyItems = processedEarlyItems.filter(
-      item => item.key !== historyItem.historyKey
-    );
+  processedEarlyItems = processedEarlyItems.filter(
+    item => item.key !== historyItem.historyKey
+  );
 
-    historyItems = historyItems.filter(item => item.historyKey !== historyKey);
+  historyItems = historyItems.filter(item => item.historyKey !== historyKey);
 
-    saveProcessedEarlyItems();
-    saveHistoryItems();
-    saveItems();
-    calculate();
+  const restoredItem = {
+    id: historyItem.itemId || Date.now(),
+    name: historyItem.name,
+    amount: historyItem.amount,
+    type: historyItem.type || (historyItem.amount >= 0 ? "income" : "bill"),
+    date: historyItem.originalDateKey || historyItem.dateKey || dateToKey(new Date(historyItem.date)),
+    repeat: historyItem.repeat || "once",
+    customInterval: historyItem.customInterval || 1,
+    customUnit: historyItem.customUnit || "days",
+    fromHistoryUndo: true
+  };
 
-    return;
+  const existingItem = items.find(
+    item => String(item.id) === String(restoredItem.id)
+  );
+
+  if (!existingItem) {
+    items.push(restoredItem);
+  } else {
+    Object.assign(existingItem, restoredItem);
   }
+
+  pendingHistoryUndo = {
+    originalHistoryItem: historyItem,
+    restoredItemId: restoredItem.id,
+    removeRestoredItemOnCancel: !existingItem
+  };
+
+  saveProcessedEarlyItems();
+  saveHistoryItems();
+  saveItems();
+
+ const originalItem = items.find(
+  item => String(item.id) === String(historyItem.itemId)
+);
+
+if (originalItem) {
+  editingId = originalItem.id;
+  editItem(originalItem.id);
+  showTab("settingsTab");
+}
+
+calculate();
+
+return;
+}
 
   const originalItemId = historyItem.itemId;
 

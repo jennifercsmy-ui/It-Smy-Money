@@ -595,6 +595,7 @@ document.getElementById("endCount").value =
 toggleCustomRepeatFields();
 toggleEndRepeatFields();
 
+
   document.getElementById("formTitle").innerText = "Edit Item";
   document.getElementById("saveButton").innerText = "Save Changes";
   document.getElementById("cancelEditButton").style.display = "block";
@@ -2255,6 +2256,7 @@ function confirmRecurringEditChoice() {
   ).value;
 
   recurringEditMode = choice;
+console.log("recurringEditMode chosen:", recurringEditMode);
 
   document.getElementById("recurringEditModal").classList.remove("show");
 
@@ -2274,7 +2276,16 @@ returnAfterEditScrollTarget = null;
     if (recurringEditMode === "single") {
       document.getElementById("repeat").value = "once";
     }
+const singleOccurrenceEdit = recurringEditMode === "single";
 
+document.getElementById("repeat").disabled = singleOccurrenceEdit;
+document.getElementById("customInterval").disabled = singleOccurrenceEdit;
+document.getElementById("customUnit").disabled = singleOccurrenceEdit;
+document.getElementById("endType").disabled = singleOccurrenceEdit;
+document.getElementById("endDate").disabled = singleOccurrenceEdit;
+document.getElementById("endCount").disabled = singleOccurrenceEdit;
+
+console.log("repeat disabled?", document.getElementById("repeat").disabled);
     toggleCustomRepeatFields();
     toggleEndRepeatFields();
   }

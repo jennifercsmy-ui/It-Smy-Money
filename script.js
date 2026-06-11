@@ -1016,18 +1016,20 @@ function buildEventsUntil(endDate, today) {
         );
 
         if (!processedEarly) {
-          const skipped = isSkipped(item.id, itemDate);
+  const skipped = isSkipped(item.id, itemDate);
 
-          events.push({
-            itemId: item.id,
-            date: new Date(itemDate),
-            dateKey,
-            name: item.name,
-            amount: item.amount,
-            repeat: item.repeat,
-            skipped
-          });
-        }
+  if (!skipped) {
+    events.push({
+      itemId: item.id,
+      date: new Date(itemDate),
+      dateKey,
+      name: item.name,
+      amount: item.amount,
+      repeat: item.repeat,
+      skipped: false
+    });
+  }
+}
       }
 
       if (item.repeat === "once") break;
@@ -2354,53 +2356,27 @@ function undoHistoryItem(historyKey) {
     item => item.key !== historyItem.historyKey
   );
 
-  historyItems = historyItems.filter(item => item.historyKey !== historyKey);
-
-  const restoredItem = {
-    id: historyItem.itemId || Date.now(),
-    name: historyItem.name,
-    amount: historyItem.amount,
-    type: historyItem.type || (historyItem.amount >= 0 ? "income" : "bill"),
-    date: historyItem.originalDateKey || historyItem.dateKey || dateToKey(new Date(historyItem.date)),
-    repeat: historyItem.repeat || "once",
-    customInterval: historyItem.customInterval || 1,
-    customUnit: historyItem.customUnit || "days",
-    fromHistoryUndo: true
-  };
-
-  const existingItem = items.find(
-    item => String(item.id) === String(restoredItem.id)
+  historyItems = historyItems.filter(
+    item => item.historyKey !== historyKey
   );
-
-  if (!existingItem) {
-    items.push(restoredItem);
-  } else {
-    Object.assign(existingItem, restoredItem);
-  }
-
-  pendingHistoryUndo = {
-    originalHistoryItem: historyItem,
-    restoredItemId: restoredItem.id,
-    removeRestoredItemOnCancel: !existingItem
-  };
 
   saveProcessedEarlyItems();
   saveHistoryItems();
   saveItems();
 
- const originalItem = items.find(
-  item => String(item.id) === String(historyItem.itemId)
-);
+  const originalItem = items.find(
+    item => String(item.id) === String(historyItem.itemId)
+  );
 
-if (originalItem) {
-  editingId = originalItem.id;
-  editItem(originalItem.id);
-  showTab("settingsTab");
-}
+  if (originalItem) {
+    editingId = originalItem.id;
+    editItem(originalItem.id);
+    showTab("settingsTab");
+  }
 
-calculate();
+  calculate();
 
-return;
+  return;
 }
 
   const originalItemId = historyItem.itemId;
@@ -2452,6 +2428,7 @@ return;
   editingId = existingItem.id;
   editItem(existingItem.id);
   showTab("settingsTab");
+  calculate();
 }
 
 function deleteHistoryItem(historyKey) {

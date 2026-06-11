@@ -308,6 +308,7 @@ z-index: 2;
   color: #666;
   white-space: nowrap;
   line-height: 1;
+  transform: translateY(40%);
 }
 .chart-extreme-label.high,
 .chart-extreme-label.low {
@@ -331,6 +332,11 @@ z-index: 2;
   display: flex;
   align-items: stretch;
 }
+
+.chart-shell:not(.overview-chart-wrap) .chart-scroll {
+  border-right: 1px solid #d8d8d8;
+}
+
 .chart-scroll {
   flex: 1;
   overflow-x: hidden;

@@ -3,7 +3,7 @@
 
   <head>
     <meta charset="UTF-8">
-    <title>It Smy Money v5.8</title>
+    <title>It Smy Money v5.9</title>
     <link rel="stylesheet" href="./style.css">
 
   </head>
@@ -263,7 +263,17 @@
     <div class="card">
   <h3>The Basics</h3>
 
-  <label>Current Balance</label>
+  
+<label for="currencySelect">Currency</label>
+<select id="currencySelect">
+  <option value="$">$ Dollar</option>
+  <option value="€">€ Euro</option>
+  <option value="£">£ Pound</option>
+  <option value="¥">¥ Yen</option>
+</select>
+
+
+<label>Current Balance</label>
   <input id="balance" type="number" step="0.01">
 
   <label>Safe Buffer</label>
@@ -272,6 +282,9 @@
  <input id="range" type="hidden" value="90">
 </div>
     
+
+
+
   
   <div class="card">
   <div class="section-header">

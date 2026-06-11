@@ -26,10 +26,12 @@ let processedEarlyItems = JSON.parse(localStorage.getItem("processedEarlyItems")
 let selectedDeletedItems = new Set();
 let pendingRecurringEdit = null;
 let recurringEditMode = null;
+let currencySymbol = localStorage.getItem("cashForecastCurrency") || "$";
 
 const balanceInput = document.getElementById("balance");
 const bufferInput = document.getElementById("buffer");
 const rangeInput = document.getElementById("range");
+const currencySelect = document.getElementById("currencySelect");
 
 balanceInput.value = localStorage.getItem("cashForecastBalance") || "";
 bufferInput.value = localStorage.getItem("cashForecastBuffer") || "";
@@ -38,6 +40,13 @@ rangeInput.value = localStorage.getItem("cashForecastRange") || "30";
 balanceInput.addEventListener("input", saveSettings);
 bufferInput.addEventListener("input", saveSettings);
 rangeInput.addEventListener("change", saveSettings);
+currencySelect.value = currencySymbol;
+currencySelect.addEventListener("change", () => {
+  currencySymbol = currencySelect.value;
+  localStorage.setItem("cashForecastCurrency", currencySymbol);
+
+  calculate();
+});
 
 document.querySelectorAll("select").forEach(select => {
   select.addEventListener("change", function () {
@@ -99,6 +108,11 @@ function saveSettings() {
   localStorage.setItem("cashForecastRange", rangeInput.value);
   calculate();
   showSaveIndicator();
+}
+
+function formatMoney(amount) {
+  const value = parseFloat(amount) || 0;
+  return currencySymbol + value.toFixed(2);
 }
 
 
@@ -1630,11 +1644,26 @@ function x(i) {
 
   return paddingLeft + ratio * width;
 }
+const yAxisSteps = 4;
 
-function y(balance) {
-  if (max === min) return paddingTop + height / 2;
+const roundingBase =
+  max > 10000 ? 5000 :
+  max > 5000 ? 2000 :
+  max > 2000 ? 1000 :
+  max > 1000 ? 500 :
+  100;
 
-  return paddingTop + ((max - balance) / (max - min)) * height;
+const axisMin =
+  min > 0
+    ? 0
+    : Math.floor(min / roundingBase) * roundingBase;
+const axisMax = Math.ceil(max / roundingBase) * roundingBase;
+const axisStep = (axisMax - axisMin) / yAxisSteps;
+
+ function y(balance) {
+  if (axisMax === axisMin) return paddingTop + height / 2;
+
+  return paddingTop + ((axisMax - balance) / (axisMax - axisMin)) * height;
 }
 
   // zero line
@@ -1828,7 +1857,7 @@ ctx.font = "11px Arial";
 ctx.font = "10px Arial";
 ctx.lineWidth = 1;
 
-const yAxisSteps = 4;
+
   
 const yAxisEl =
   canvasId === "balanceChart"
@@ -1846,29 +1875,15 @@ if (yAxisEl) {
 }  
 
 for (let step = 0; step <= yAxisSteps; step++) {
-  const rawValue = min + ((max - min) / yAxisSteps) * step;
+  const roundedValue = axisMax - axisStep * step;
 
-const roundingBase =
-  max > 10000 ? 2000 :
-  max > 5000 ? 1000 :
-  max > 2000 ? 500 :
-  100;
-
-const value =
-  Math.round(rawValue / roundingBase) * roundingBase;
-
-const roundedValue =
-  Math.abs(value) < (max - min) / 10
-    ? 0
-    : value;
-
-const py = y(roundedValue);
+  const py = y(roundedValue);
   
   if (yAxisEl) {
   const label = document.createElement("div");
 
   label.className = "chart-y-label";
-  label.style.top = (py - 5) + "px";
+  label.style.top = py + "px";
 
   label.innerText = Math.round(roundedValue).toLocaleString("en-CA", {
     style: "currency",
@@ -1878,7 +1893,7 @@ const py = y(roundedValue);
 
   yAxisEl.appendChild(label);
 }
-if (step === 0 && yAxisEl) {
+if (step === yAxisSteps && yAxisEl) {
   const lowLabel = document.createElement("div");
 
   lowLabel.className = "chart-extreme-label low";
@@ -1895,7 +1910,7 @@ if (step === 0 && yAxisEl) {
   yAxisEl.appendChild(lowLabel);
 }
 
-if (step === yAxisSteps && yAxisEl) {
+if (step === 0 && yAxisEl) {
   const highLabel = document.createElement("div");
 
   highLabel.className = "chart-extreme-label high";
@@ -1915,7 +1930,7 @@ if (step === yAxisSteps && yAxisEl) {
   ctx.setLineDash([]);
 
   ctx.beginPath();
-  ctx.moveTo(paddingLeft, py);
+ ctx.moveTo(0, py);
 ctx.lineTo(canvas.width - paddingRight, py);
   ctx.stroke();
 /*
@@ -2316,9 +2331,7 @@ function displayCalendarHistory() {
     <div class="forecast-item">
       <strong>${item.name}</strong>
 
-      <div class="forecast-sub-row">
-        ${formatDateObj(new Date(item.date))}
-      </div>
+     
 
      <div class="forecast-sub-row">
   ${formatDateObj(new Date(item.date))}
@@ -2334,14 +2347,21 @@ function displayCalendarHistory() {
     Undo & Edit
   </button>
 
-  <button onclick="deleteHistoryItem('${item.historyKey}')">
-    Delete
-  </button>
+  <button onclick="confirmDeleteHistoryItem('${item.historyKey}')">
+  Delete
+</button>
 </div>
     </div>
   `).join("");
 }
-
+function confirmDeleteHistoryItem(historyKey) {
+  showConfirmModal(
+    "Remove this history record? This will hide it from History, but your balance will stay the same. Use Undo & Edit if you need to reverse or change the transaction.",
+    () => {
+      deleteHistoryItem(historyKey);
+    }
+  );
+}
 function undoHistoryItem(historyKey) {
   const historyItem = historyItems.find(item => item.historyKey === historyKey);
   if (!historyItem) return;
@@ -2752,10 +2772,10 @@ function formatMoney(amount) {
   const sign = amount < 0 ? "-" : "";
   const absolute = Math.abs(amount);
 
-  return sign + "$" + absolute.toLocaleString("en-CA", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
+return sign + currencySymbol + absolute.toLocaleString("en-CA", {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2
+});
 }
 
 function formatShortDate(dateString) {
@@ -2988,8 +3008,8 @@ if (dayBalance !== null) {
   balanceEl.className =
     "calendar-balance " + (dayBalance < 0 ? "bill" : "income");
 
-  balanceEl.innerText =
-    "$" + Math.round(dayBalance).toLocaleString("en-CA");
+ balanceEl.innerText =
+  currencySymbol + Math.round(dayBalance).toLocaleString("en-CA");
 
   cell.appendChild(balanceEl);
 }

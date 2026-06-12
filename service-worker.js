@@ -1,4 +1,4 @@
-const CACHE_NAME = "it-smy-money-v5-5";
+const CACHE_NAME = "it-smy-money-v6-icon";
 
 self.addEventListener("install", event => {
   self.skipWaiting();

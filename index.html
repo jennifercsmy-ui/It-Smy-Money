@@ -264,20 +264,40 @@
   <h3>The Basics</h3>
 
   
-<label for="currencySelect">Currency</label>
-<select id="currencySelect">
-  <option value="$">$ Dollar</option>
-  <option value="€">€ Euro</option>
-  <option value="£">£ Pound</option>
-  <option value="¥">¥ Yen</option>
-</select>
+<div class="vitals-row">
 
+  <div class="currency-group">
+   
+    <select id="currencySelect">
+      <option value="$">$</option>
+      <option value="€">€</option>
+      <option value="£">£</option>
+      <option value="¥">¥</option>
+      <option value="₹">₹</option>
+      <option value="₩">₩</option>
+    </select>
+  </div>
 
-<label>Current Balance</label>
-  <input id="balance" type="number" step="0.01">
+  <div class="balance-group">
+    <label>Current Balance</label>
+    <input id="balance" type="number" step="0.01">
+  </div>
 
-  <label>Safe Buffer</label>
-  <input id="buffer" type="number" step="0.01" placeholder="Example: 200">
+</div>
+
+ <div class="vitals-row">
+
+<div class="currency-group"></div>
+
+  <div class="balance-group">
+    <label>Safe Buffer</label>
+    <input id="buffer"
+           type="number"
+           step="0.01"
+           placeholder="Example: 200">
+  </div>
+
+</div>
 
  <input id="range" type="hidden" value="90">
 </div>

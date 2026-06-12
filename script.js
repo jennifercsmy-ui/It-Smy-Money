@@ -26,6 +26,7 @@ let processedEarlyItems = JSON.parse(localStorage.getItem("processedEarlyItems")
 let selectedDeletedItems = new Set();
 let pendingRecurringEdit = null;
 let recurringEditMode = null;
+let pendingSkippedRestore = null;
 let currencySymbol = localStorage.getItem("cashForecastCurrency") || "$";
 
 const balanceInput = document.getElementById("balance");
@@ -367,7 +368,14 @@ function saveDeletedItems() {
 
   showSaveIndicator();
 }
-
+function enableRepeatControls() {
+  document.getElementById("repeat").disabled = false;
+  document.getElementById("customInterval").disabled = false;
+  document.getElementById("customUnit").disabled = false;
+  document.getElementById("endType").disabled = false;
+  document.getElementById("endDate").disabled = false;
+  document.getElementById("endCount").disabled = false;
+}
 
 function saveFormItem() {
   const name = document.getElementById("name").value.trim();
@@ -432,8 +440,12 @@ if (
     endCount: ""
   });
 
-  saveItems();
+saveItems();
 saveSkippedEvents();
+
+pendingSkippedRestore = null;
+enableRepeatControls();
+
 clearInputs();
 resetFormEditState();
 calculate();
@@ -484,7 +496,11 @@ if (
     endCount
   });
 
-  saveItems();
+saveItems();
+
+pendingSkippedRestore = null;
+enableRepeatControls();
+
 clearInputs();
 resetFormEditState();
 calculate();
@@ -547,6 +563,10 @@ calculate();
 }
 
 saveItems();
+
+pendingSkippedRestore = null;
+enableRepeatControls();
+
 clearInputs();
 calculate();
 
@@ -672,7 +692,39 @@ function cancelEdit() {
     showTab("calendarTab");
     return;
   }
+if (pendingSkippedRestore) {
+  const alreadyBackInSkipped = skippedEvents.some(
+    skip => skip.key === pendingSkippedRestore.key
+  );
 
+  if (!alreadyBackInSkipped) {
+    skippedEvents.push(pendingSkippedRestore);
+  }
+
+  pendingSkippedRestore = null;
+  recurringEditMode = null;
+  pendingRecurringEdit = null;
+  editingId = null;
+
+  clearInputs();
+
+  document.getElementById("formTitle").innerText = "Add Income or Bill";
+  document.getElementById("saveButton").innerText = "Add";
+  document.getElementById("cancelEditButton").style.display = "none";
+
+  document.getElementById("repeat").disabled = false;
+  document.getElementById("customInterval").disabled = false;
+  document.getElementById("customUnit").disabled = false;
+  document.getElementById("endType").disabled = false;
+  document.getElementById("endDate").disabled = false;
+  document.getElementById("endCount").disabled = false;
+
+  saveSkippedEvents();
+  calculate();
+
+  showTab("settingsTab");
+  return;
+}
   editingId = null;
   clearInputs();
 
@@ -891,10 +943,56 @@ refreshSelectedCalendarDay();
 
 
 function restoreEvent(key) {
- skippedEvents = skippedEvents.filter(skip => skip.key !== key);
-saveSkippedEvents();
-calculate();
-refreshSelectedCalendarDay();
+  const skip = skippedEvents.find(skip => skip.key === key);
+  if (!skip) return;
+
+  const originalItem = items.find(
+    item => String(item.id) === String(skip.itemId)
+  );
+
+  if (!originalItem) return;
+
+  pendingSkippedRestore = skip;
+
+  skippedEvents = skippedEvents.filter(skip => skip.key !== key);
+  saveSkippedEvents();
+
+  showTab("settingsTab");
+
+  if (originalItem.repeat === "once") {
+    editingId = originalItem.id;
+    editItem(originalItem.id);
+
+    document.getElementById("date").value = skip.dateKey;
+    document.getElementById("amount").value = Math.abs(skip.amount);
+  } else {
+    pendingRecurringEdit = {
+      itemId: skip.itemId,
+      dateKey: skip.dateKey
+    };
+
+    recurringEditMode = "single";
+
+    editItem(originalItem.id);
+
+    editingId = null;
+
+    document.getElementById("date").value = skip.dateKey;
+    document.getElementById("amount").value = Math.abs(skip.amount);
+    document.getElementById("repeat").value = "once";
+
+    document.getElementById("repeat").disabled = true;
+    document.getElementById("customInterval").disabled = true;
+    document.getElementById("customUnit").disabled = true;
+    document.getElementById("endType").disabled = true;
+    document.getElementById("endDate").disabled = true;
+    document.getElementById("endCount").disabled = true;
+
+    toggleCustomRepeatFields();
+    toggleEndRepeatFields();
+  }
+
+  refreshSelectedCalendarDay();
 }
 function removeSkippedEvent(key) {
   const skipToRemove = skippedEvents.find(item => item.key === key);

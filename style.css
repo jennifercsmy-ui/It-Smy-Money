@@ -1305,4 +1305,26 @@ color: #1D3557 !important;
   text-align: center;
 }
   
+  .vitals-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.currency-group {
+  flex: 0 0 55px;
+}
+
+.currency-group select {
+  text-align: center;
+}
+
+.balance-group {
+  flex: 2.7;
+}
+#balance,
+#buffer {
+  text-align: right;
+}
+  
 }

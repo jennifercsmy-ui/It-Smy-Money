@@ -1251,7 +1251,10 @@ if (itemDate <= todayCopy && !alreadyLogged && !alreadyDeleted && !alreadySkippe
   }
 });
   let balance = parseFloat(balanceInput.value) || 0;
-let buffer = parseFloat(bufferInput.value) || 0;
+let buffer = Math.max(
+  0,
+  parseFloat(bufferInput.value) || 0
+);
 
 let rangeDays = window.rangeDays || parseInt(rangeInput.value) || 30;
 window.rangeDays = rangeDays;

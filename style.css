@@ -1318,7 +1318,12 @@ color: #1D3557 !important;
 .currency-group select {
   text-align: center;
 }
-
+#currencySelect {
+  text-align: center;
+  text-align-last: center;
+  padding-left: 0;
+  padding-right: 0;
+}
 .balance-group {
   flex: 2.7;
 }

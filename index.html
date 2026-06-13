@@ -481,12 +481,13 @@
 
 <script>
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./service-worker.js", {
-      scope: "./"
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./service-worker.js", {
+        scope: "./"
+      });
     });
   }
 </script>
-
 </body>
 </html>
     <script  src="./script.js"></script>
